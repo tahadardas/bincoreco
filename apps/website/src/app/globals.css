@@ -1,0 +1,127 @@
+:root {
+  --br-black: #0D0D0D;
+  --br-gold: #C9961A;
+  --br-gold-dark: #9E7410;
+  --br-cream: #F8F3E7;
+  --br-white: #FFFFFF;
+  --br-coffee: #4B2E1E;
+  --br-espresso: #1F130E;
+  --br-muted: #7A6A58;
+  --br-success: #2E7D32;
+  --br-warning: #B26A00;
+  --br-danger: #B42318;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--br-cream);
+  color: var(--br-black);
+  line-height: 1.6;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 16px;
+  transition: all 0.2s;
+}
+
+.btn-primary {
+  background: var(--br-gold);
+  color: var(--br-black);
+}
+
+.btn-primary:hover {
+  background: var(--br-gold-dark);
+}
+
+.btn-outline {
+  background: transparent;
+  border: 2px solid var(--br-gold);
+  color: var(--br-gold);
+}
+
+.btn-outline:hover {
+  background: var(--br-gold);
+  color: var(--br-black);
+}
+
+.card {
+  background: var(--br-white);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+}
+
+.grid {
+  display: grid;
+  gap: 24px;
+}
+
+.grid-2 {
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+.grid-3 {
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+.badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.badge-gold {
+  background: var(--br-gold);
+  color: var(--br-black);
+}
+
+.badge-cream {
+  background: var(--br-cream);
+  color: var(--br-coffee);
+}

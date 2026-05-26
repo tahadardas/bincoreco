@@ -1,0 +1,78 @@
+'use client';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { api } from './api';
+
+interface User {
+  id: string;
+  email: string | null;
+  phone: string | null;
+  fullName: string;
+}
+
+interface AuthContextType {
+  user: User | null;
+  token: string | null;
+  login: (email: string, password: string) => Promise<void>;
+  register: (input: { email?: string; phone?: string; password: string; fullName: string }) => Promise<void>;
+  logout: () => void;
+  loading: boolean;
+}
+
+const AuthContext = createContext<AuthContextType | null>(null);
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const storedToken = localStorage.getItem('token');
+    if (storedToken) {
+      setToken(storedToken);
+      api.get<any>('/auth/me', storedToken)
+        .then(setUser)
+        .catch(() => {
+          localStorage.removeItem('token');
+          localStorage.removeItem('refreshToken');
+        })
+        .finally(() => setLoading(false));
+    } else {
+      setLoading(false);
+    }
+  }, []);
+
+  const login = async (email: string, password: string) => {
+    const result = await api.post<{ user: User; accessToken: string; refreshToken: string }>('/auth/login', { email, password });
+    setUser(result.user);
+    setToken(result.accessToken);
+    localStorage.setItem('token', result.accessToken);
+    localStorage.setItem('refreshToken', result.refreshToken);
+  };
+
+  const register = async (input: { email?: string; phone?: string; password: string; fullName: string }) => {
+    const result = await api.post<{ user: User; accessToken: string; refreshToken: string }>('/auth/register', input);
+    setUser(result.user);
+    setToken(result.accessToken);
+    localStorage.setItem('token', result.accessToken);
+    localStorage.setItem('refreshToken', result.refreshToken);
+  };
+
+  const logout = () => {
+    setUser(null);
+    setToken(null);
+    localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, token, login, register, logout, loading }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  return ctx;
+}

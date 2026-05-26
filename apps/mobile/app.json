@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "Banco Ricco",
+    "slug": "banco-ricco",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#0D0D0D"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.banco.ricco"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0D0D0D"
+      },
+      "package": "com.banco.ricco"
+    }
+  }
+}

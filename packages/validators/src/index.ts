@@ -1,0 +1,124 @@
+import { z } from 'zod';
+
+export const registerSchema = z.object({
+  email: z.string().email().optional(),
+  phone: z.string().min(7).max(20).optional(),
+  password: z.string().min(6).max(100),
+  fullName: z.string().min(1).max(200),
+}).refine(data => data.email || data.phone, {
+  message: 'Email or phone is required',
+});
+
+export const loginSchema = z.object({
+  email: z.string().email().optional(),
+  phone: z.string().optional(),
+  password: z.string().min(1),
+}).refine(data => data.email || data.phone, {
+  message: 'Email or phone is required',
+});
+
+export const refreshSchema = z.object({
+  refreshToken: z.string().min(1),
+});
+
+export const createCategorySchema = z.object({
+  slug: z.string().min(1).max(100),
+  imageUrl: z.string().url().optional(),
+  isActive: z.boolean().default(true),
+  sortOrder: z.number().int().default(0),
+  translations: z.array(z.object({
+    locale: z.enum(['ar', 'en']),
+    name: z.string().min(1).max(200),
+    description: z.string().optional(),
+  })).min(1),
+});
+
+export const updateCategorySchema = createCategorySchema.partial();
+
+export const createProductSchema = z.object({
+  type: z.enum(['HOT_DRINK', 'COLD_DRINK', 'COFFEE_BEAN', 'GROUND_COFFEE', 'PACKAGE']),
+  sku: z.string().min(1).max(50),
+  categoryId: z.string().uuid(),
+  isActive: z.boolean().default(true),
+  isFeatured: z.boolean().default(false),
+  isBestSeller: z.boolean().default(false),
+  isMaestroPick: z.boolean().default(false),
+  imageUrl: z.string().optional(),
+  basePreparationTimeMinutes: z.number().int().min(1).default(15),
+  sortOrder: z.number().int().default(0),
+  translations: z.array(z.object({
+    locale: z.enum(['ar', 'en']),
+    name: z.string().min(1).max(200),
+    shortDescription: z.string().optional(),
+    description: z.string().optional(),
+  })).min(1),
+  variants: z.array(z.object({
+    name: z.string().min(1).max(100),
+    sizeValue: z.number().optional(),
+    sizeUnit: z.string().optional(),
+    isActive: z.boolean().default(true),
+    sortOrder: z.number().int().default(0),
+    prices: z.array(z.object({
+      currencyCode: z.string().min(1).max(3),
+      amount: z.number().positive(),
+    })).min(1),
+  })).min(1),
+});
+
+export const updateProductSchema = createProductSchema.partial();
+
+export const createGrindOptionSchema = z.object({
+  code: z.string().min(1).max(50),
+  nameAr: z.string().min(1).max(200),
+  nameEn: z.string().min(1).max(200),
+  descriptionAr: z.string().optional(),
+  descriptionEn: z.string().optional(),
+  isActive: z.boolean().default(true),
+  sortOrder: z.number().int().default(0),
+});
+
+export const updateGrindOptionSchema = createGrindOptionSchema.partial();
+
+export const addCartItemSchema = z.object({
+  productId: z.string().uuid(),
+  variantId: z.string().uuid().optional(),
+  quantity: z.number().int().positive().default(1),
+  selectedOptions: z.record(z.unknown()).optional(),
+});
+
+export const updateCartItemSchema = z.object({
+  quantity: z.number().int().positive(),
+});
+
+export const createOrderSchema = z.object({
+  pickupTime: z.string().datetime(),
+  notes: z.string().optional(),
+});
+
+export const updateOrderStatusSchema = z.object({
+  status: z.enum(['PENDING', 'ACCEPTED', 'PREPARING', 'READY_FOR_PICKUP', 'PICKED_UP', 'CANCELLED']),
+  reason: z.string().optional(),
+});
+
+export const reportFiltersSchema = z.object({
+  fromDate: z.string().datetime().optional(),
+  toDate: z.string().datetime().optional(),
+  productId: z.string().uuid().optional(),
+  categoryId: z.string().uuid().optional(),
+  status: z.string().optional(),
+});
+
+export type RegisterInput = z.infer<typeof registerSchema>;
+export type LoginInput = z.infer<typeof loginSchema>;
+export type RefreshInput = z.infer<typeof refreshSchema>;
+export type CreateCategoryInput = z.infer<typeof createCategorySchema>;
+export type UpdateCategoryInput = z.infer<typeof updateCategorySchema>;
+export type CreateProductInput = z.infer<typeof createProductSchema>;
+export type UpdateProductInput = z.infer<typeof updateProductSchema>;
+export type CreateGrindOptionInput = z.infer<typeof createGrindOptionSchema>;
+export type UpdateGrindOptionInput = z.infer<typeof updateGrindOptionSchema>;
+export type AddCartItemInput = z.infer<typeof addCartItemSchema>;
+export type UpdateCartItemInput = z.infer<typeof updateCartItemSchema>;
+export type CreateOrderInput = z.infer<typeof createOrderSchema>;
+export type UpdateOrderStatusInput = z.infer<typeof updateOrderStatusSchema>;
+export type ReportFiltersInput = z.infer<typeof reportFiltersSchema>;

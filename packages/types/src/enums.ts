@@ -1,0 +1,49 @@
+export enum ProductType {
+  HOT_DRINK = 'HOT_DRINK',
+  COLD_DRINK = 'COLD_DRINK',
+  COFFEE_BEAN = 'COFFEE_BEAN',
+  GROUND_COFFEE = 'GROUND_COFFEE',
+  PACKAGE = 'PACKAGE',
+  SUBSCRIPTION = 'SUBSCRIPTION',
+  GIFT_CARD = 'GIFT_CARD',
+}
+
+export enum OrderStatus {
+  PENDING = 'PENDING',
+  ACCEPTED = 'ACCEPTED',
+  PREPARING = 'PREPARING',
+  READY_FOR_PICKUP = 'READY_FOR_PICKUP',
+  PICKED_UP = 'PICKED_UP',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum PaymentStatus {
+  PENDING = 'PENDING',
+  PAID = 'PAID',
+  FAILED = 'FAILED',
+  REFUNDED = 'REFUNDED',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum GrindOptionCode {
+  WHOLE_BEAN = 'WHOLE_BEAN',
+  ESPRESSO = 'ESPRESSO',
+  TURKISH_SHAMI = 'TURKISH_SHAMI',
+  V60 = 'V60',
+  AMERICAN_COFFEE = 'AMERICAN_COFFEE',
+  MOKA_POT = 'MOKA_POT',
+  FRENCH_PRESS = 'FRENCH_PRESS',
+  COLD_BREW = 'COLD_BREW',
+}
+
+export enum RoastLevel {
+  LIGHT = 'LIGHT',
+  MEDIUM = 'MEDIUM',
+  MEDIUM_DARK = 'MEDIUM_DARK',
+  DARK = 'DARK',
+}
+
+export enum Locale {
+  AR = 'ar',
+  EN = 'en',
+}

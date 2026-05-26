@@ -1,0 +1,25 @@
+{
+  "name": "banco-ricco",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev -w apps/api",
+    "dev:website": "npm run dev -w apps/website",
+    "dev:admin": "npm run dev -w apps/admin",
+    "dev:mobile": "npm run dev -w apps/mobile",
+    "build": "npm run build -w packages/types && npm run build -w packages/validators && npm run build -w packages/config && npm run build -w apps/api && npm run build -w apps/website && npm run build -w apps/admin",
+    "lint": "npm run lint -w apps/api && npm run lint -w apps/website && npm run lint -w apps/admin",
+    "typecheck": "npm run typecheck -w packages/types && npm run typecheck -w packages/validators && npm run typecheck -w apps/api && npm run typecheck -w apps/website && npm run typecheck -w apps/admin",
+    "test": "npm run test -w apps/api",
+    "db:generate": "npm run db:generate -w apps/api",
+    "db:push": "npm run db:push -w apps/api",
+    "db:seed": "npm run db:seed -w apps/api",
+    "setup": "npm install && npm run build -w packages/types && npm run db:generate && npm run db:push && npm run db:seed"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  }
+}

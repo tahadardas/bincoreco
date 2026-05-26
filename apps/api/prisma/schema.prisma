@@ -1,0 +1,378 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ProductType {
+  HOT_DRINK
+  COLD_DRINK
+  COFFEE_BEAN
+  GROUND_COFFEE
+  PACKAGE
+  SUBSCRIPTION
+  GIFT_CARD
+}
+
+enum OrderStatus {
+  PENDING
+  ACCEPTED
+  PREPARING
+  READY_FOR_PICKUP
+  PICKED_UP
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+  CANCELLED
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String?  @unique
+  phone        String?  @unique
+  passwordHash String?
+  fullName     String
+  role         String   @default("customer")
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  customerProfile CustomerProfile?
+  cart            Cart?
+  orders          Order[]
+  auditLogs       AuditLog[]
+
+  @@map("users")
+}
+
+model CustomerProfile {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+  avatarUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  loyaltyAccount LoyaltyAccount?
+  qrCard         QRCard?
+
+  @@map("customer_profiles")
+}
+
+model Category {
+  id        String   @id @default(uuid())
+  slug      String   @unique
+  imageUrl  String?
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  products     Product[]
+  translations CategoryTranslation[]
+
+  @@map("categories")
+}
+
+model CategoryTranslation {
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  locale      String
+  name        String
+  description String?
+
+  @@id([categoryId, locale])
+  @@map("category_translations")
+}
+
+model Product {
+  id                         String      @id @default(uuid())
+  type                       ProductType
+  sku                        String      @unique
+  categoryId                 String
+  category                   Category    @relation(fields: [categoryId], references: [id])
+  isActive                   Boolean     @default(true)
+  isFeatured                 Boolean     @default(false)
+  isBestSeller               Boolean     @default(false)
+  isMaestroPick              Boolean     @default(false)
+  imageUrl                   String?
+  basePreparationTimeMinutes Int         @default(15)
+  sortOrder                  Int         @default(0)
+  createdAt                  DateTime    @default(now())
+  updatedAt                  DateTime    @updatedAt
+  deletedAt                  DateTime?
+
+  translations ProductTranslation[]
+  variants     ProductVariant[]
+  coffeeProfile CoffeeProfile?
+  cartItems    CartItem[]
+  orderItems   OrderItem[]
+
+  @@map("products")
+}
+
+model ProductTranslation {
+  productId       String
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  locale          String
+  name            String
+  shortDescription String?
+  description     String?
+  microStory      String?
+
+  @@id([productId, locale])
+  @@map("product_translations")
+}
+
+model ProductVariant {
+  id        String  @id @default(uuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name      String
+  sizeValue Float?
+  sizeUnit  String?
+  isActive  Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  prices       Price[]
+  cartItems    CartItem[]
+  orderItems   OrderItem[]
+
+  @@map("product_variants")
+}
+
+model Price {
+  id               String         @id @default(uuid())
+  productVariantId String
+  productVariant   ProductVariant @relation(fields: [productVariantId], references: [id], onDelete: Cascade)
+  currencyCode     String
+  amount           Float
+  isActive         Boolean        @default(true)
+
+  @@map("prices")
+}
+
+model CoffeeProfile {
+  id                 String   @id @default(uuid())
+  productId          String   @unique
+  product            Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  originCountry      String?
+  blendName          String?
+  isSecretBlend      Boolean  @default(false)
+  roastLevel         String?
+  acidityLevel       Int      @default(5)
+  bodyLevel          Int      @default(5)
+  sweetnessLevel     Int      @default(5)
+  bitternessLevel    Int      @default(5)
+  caffeineLevel      Int      @default(5)
+  flavorNotes        String[]
+  recommendedMethods String[]
+  maestroNote        String?
+
+  @@map("coffee_profiles")
+}
+
+model GrindOption {
+  id            String  @id @default(uuid())
+  code          String  @unique
+  nameAr        String
+  nameEn        String
+  descriptionAr String?
+  descriptionEn String?
+  isActive      Boolean @default(true)
+  sortOrder     Int     @default(0)
+
+  @@map("grind_options")
+}
+
+model Cart {
+  id         String   @id @default(uuid())
+  customerId String   @unique
+  customer   User     @relation(fields: [customerId], references: [id])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  items CartItem[]
+
+  @@map("carts")
+}
+
+model CartItem {
+  id        String         @id @default(uuid())
+  cartId    String
+  cart      Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product        @relation(fields: [productId], references: [id])
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id])
+  quantity  Int            @default(1)
+  selectedOptions Json?
+
+  @@map("cart_items")
+}
+
+model Order {
+  id                  String      @id @default(uuid())
+  orderNumber         String      @unique
+  customerId          String
+  customer            User        @relation(fields: [customerId], references: [id])
+  status              OrderStatus @default(PENDING)
+  currencyCode        String      @default("SYP")
+  subtotal            Float       @default(0)
+  discountTotal       Float       @default(0)
+  loyaltyPointsUsed   Int         @default(0)
+  total               Float       @default(0)
+  paymentMethod       String      @default("cash")
+  paymentStatus       PaymentStatus @default(PENDING)
+  pickupTime          DateTime
+  notes               String?
+  cancellationReason  String?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  items        OrderItem[]
+  statusHistory OrderStatusHistory[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id                     String         @id @default(uuid())
+  orderId                String
+  order                  Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId              String
+  product                Product        @relation(fields: [productId], references: [id])
+  variantId              String?
+  variant                ProductVariant? @relation(fields: [variantId], references: [id])
+  productNameSnapshot    String
+  variantSnapshot        Json?
+  selectedOptionsSnapshot Json?
+  unitPrice              Float
+  quantity               Int
+  total                  Float
+
+  @@map("order_items")
+}
+
+model OrderStatusHistory {
+  id        String   @id @default(uuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  fromStatus OrderStatus?
+  toStatus  OrderStatus
+  changedBy String?
+  reason    String?
+  createdAt DateTime @default(now())
+
+  @@map("order_status_histories")
+}
+
+model LoyaltyAccount {
+  id                String   @id @default(uuid())
+  customerId        String   @unique
+  customer          CustomerProfile @relation(fields: [customerId], references: [id])
+  balance           Int      @default(0)
+  lifetimeEarned    Int      @default(0)
+  lifetimeRedeemed  Int      @default(0)
+  stampCount        Int      @default(0)
+  stampTotalEarned  Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  transactions LoyaltyTransaction[]
+
+  @@map("loyalty_accounts")
+}
+
+model LoyaltyTransaction {
+  id               String         @id @default(uuid())
+  loyaltyAccountId String
+  loyaltyAccount   LoyaltyAccount @relation(fields: [loyaltyAccountId], references: [id], onDelete: Cascade)
+  type             String
+  points           Int
+  reason           String?
+  orderId          String?
+  createdBy        String?
+  createdAt        DateTime       @default(now())
+
+  @@map("loyalty_transactions")
+}
+
+model QRCard {
+  id            String    @id @default(uuid())
+  customerId    String    @unique
+  customer      CustomerProfile @relation(fields: [customerId], references: [id])
+  publicToken   String    @unique
+  isActive      Boolean   @default(true)
+  regeneratedAt DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@map("qr_cards")
+}
+
+model Currency {
+  code        String  @id
+  name        String
+  symbol      String
+  isDefault   Boolean @default(false)
+  isActive    Boolean @default(true)
+
+  @@map("currencies")
+}
+
+model Banner {
+  id        String   @id @default(uuid())
+  imageUrl  String
+  linkUrl   String?
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  translations BannerTranslation[]
+
+  @@map("banners")
+}
+
+model BannerTranslation {
+  bannerId String
+  banner   Banner  @relation(fields: [bannerId], references: [id], onDelete: Cascade)
+  locale   String
+  title    String?
+  subtitle String?
+
+  @@id([bannerId, locale])
+  @@map("banner_translations")
+}
+
+model Setting {
+  key   String @id
+  value String
+
+  @@map("settings")
+}
+
+model AuditLog {
+  id             String   @id @default(uuid())
+  actorUserId    String?
+  actor          User?    @relation(fields: [actorUserId], references: [id])
+  action         String
+  entityType     String
+  entityId       String
+  beforeSnapshot Json?
+  afterSnapshot  Json?
+  ipAddress      String?
+  userAgent      String?
+  createdAt      DateTime @default(now())
+
+  @@map("audit_logs")
+}
