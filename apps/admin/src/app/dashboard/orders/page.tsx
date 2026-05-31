@@ -1,79 +1,56 @@
 'use client';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { adminFetch } from '@/lib/api';
-import { formatMoney, MoneyAmount } from '@/lib/money';
+import { useCallback, useMemo, useState } from 'react';
+import { useOrders, useUpdateOrderStatus } from '@/lib/admin-api';
+import { formatMoney } from '@/lib/money';
+import ConfirmDialog from '@/components/confirm-dialog';
+import { OrderStatus } from '@banco-ricco/types';
 
-interface OrderItem {
-  id: string;
-  productNameSnapshot: string;
-  quantity: number;
-  grindType?: string | null;
-  grindOptionNameAr?: string | null;
-  grindOptionNameEn?: string | null;
-  variantSnapshot?: { name?: string; sizeValue?: number; sizeUnit?: string } | null;
-}
+type StatusOption = '' | OrderStatus;
 
-interface Order {
-  id: string;
-  orderNumber: string;
-  status: OrderStatus;
-  total: MoneyAmount;
-  currencyCode?: string;
-  pickupTime: string;
-  createdAt: string;
-  cancellationReason?: string | null;
-  customer: { fullName: string; phone: string | null } | null;
-  guestName?: string | null;
-  guestPhone?: string | null;
-  items: OrderItem[];
-}
-
-type OrderStatus = 'PENDING' | 'ACCEPTED' | 'PREPARING' | 'READY_FOR_PICKUP' | 'PICKED_UP' | 'CANCELLED';
-
-const statuses: { value: '' | OrderStatus; label: string }[] = [
+const statusOptions: { value: StatusOption; label: string }[] = [
   { value: '', label: 'الكل' },
-  { value: 'PENDING', label: 'معلق' },
-  { value: 'ACCEPTED', label: 'مقبول' },
-  { value: 'PREPARING', label: 'قيد التحضير' },
-  { value: 'READY_FOR_PICKUP', label: 'جاهز' },
-  { value: 'PICKED_UP', label: 'تم الاستلام' },
-  { value: 'CANCELLED', label: 'ملغي' },
+  { value: OrderStatus.PENDING, label: 'معلق' },
+  { value: OrderStatus.ACCEPTED, label: 'مقبول' },
+  { value: OrderStatus.PREPARING, label: 'قيد التحضير' },
+  { value: OrderStatus.READY_FOR_PICKUP, label: 'جاهز' },
+  { value: OrderStatus.PICKED_UP, label: 'تم الاستلام' },
+  { value: OrderStatus.CANCELLED, label: 'ملغي' },
 ];
 
 const statusLabels: Record<OrderStatus, string> = {
-  PENDING: 'معلق',
-  ACCEPTED: 'مقبول',
-  PREPARING: 'قيد التحضير',
-  READY_FOR_PICKUP: 'جاهز للاستلام',
-  PICKED_UP: 'تم الاستلام',
-  CANCELLED: 'ملغي',
+  [OrderStatus.PENDING]: 'معلق',
+  [OrderStatus.ACCEPTED]: 'مقبول',
+  [OrderStatus.PREPARING]: 'قيد التحضير',
+  [OrderStatus.READY_FOR_PICKUP]: 'جاهز للاستلام',
+  [OrderStatus.PICKED_UP]: 'تم الاستلام',
+  [OrderStatus.CANCELLED]: 'ملغي',
 };
 
 const statusColors: Record<OrderStatus, { background: string; color: string }> = {
-  PENDING: { background: 'var(--br-warning)', color: 'white' },
-  ACCEPTED: { background: 'var(--br-gold)', color: 'var(--br-black)' },
-  PREPARING: { background: 'var(--br-coffee)', color: 'white' },
-  READY_FOR_PICKUP: { background: 'var(--br-success)', color: 'white' },
-  PICKED_UP: { background: 'var(--br-muted)', color: 'white' },
-  CANCELLED: { background: 'var(--br-danger)', color: 'white' },
+  [OrderStatus.PENDING]: { background: 'var(--br-warning)', color: 'white' },
+  [OrderStatus.ACCEPTED]: { background: 'var(--br-gold)', color: 'var(--br-black)' },
+  [OrderStatus.PREPARING]: { background: 'var(--br-coffee)', color: 'white' },
+  [OrderStatus.READY_FOR_PICKUP]: { background: 'var(--br-success)', color: 'white' },
+  [OrderStatus.PICKED_UP]: { background: 'var(--br-muted)', color: 'white' },
+  [OrderStatus.CANCELLED]: { background: 'var(--br-danger)', color: 'white' },
 };
 
 const nextStatusActions: Partial<Record<OrderStatus, { status: OrderStatus; label: string; danger?: boolean }[]>> = {
-  PENDING: [
-    { status: 'ACCEPTED', label: 'قبول' },
-    { status: 'CANCELLED', label: 'إلغاء', danger: true },
+  [OrderStatus.PENDING]: [
+    { status: OrderStatus.ACCEPTED, label: 'قبول' },
+    { status: OrderStatus.CANCELLED, label: 'إلغاء', danger: true },
   ],
-  ACCEPTED: [
-    { status: 'PREPARING', label: 'بدء التحضير' },
-    { status: 'CANCELLED', label: 'إلغاء', danger: true },
+  [OrderStatus.ACCEPTED]: [
+    { status: OrderStatus.PREPARING, label: 'بدء التحضير' },
+    { status: OrderStatus.CANCELLED, label: 'إلغاء', danger: true },
   ],
-  PREPARING: [
-    { status: 'READY_FOR_PICKUP', label: 'جاهز للاستلام' },
-    { status: 'CANCELLED', label: 'إلغاء', danger: true },
+  [OrderStatus.PREPARING]: [
+    { status: OrderStatus.READY_FOR_PICKUP, label: 'جاهز للاستلام' },
+    { status: OrderStatus.CANCELLED, label: 'إلغاء', danger: true },
   ],
-  READY_FOR_PICKUP: [
-    { status: 'PICKED_UP', label: 'تم الاستلام' },
-    { status: 'CANCELLED', label: 'إلغاء', danger: true },
+  [OrderStatus.READY_FOR_PICKUP]: [
+    { status: OrderStatus.PICKED_UP, label: 'تم الاستلام' },
+    { status: OrderStatus.CANCELLED, label: 'إلغاء', danger: true },
   ],
 };
 
@@ -92,7 +69,7 @@ function formatDateTime(value: string) {
   }).format(new Date(value));
 }
 
-function describeItem(item: OrderItem) {
+function describeItem(item: { productNameSnapshot: string; quantity: number; grindType?: string | null; grindOptionNameAr?: string | null; grindOptionNameEn?: string | null; variantSnapshot?: { name?: string; sizeValue?: number; sizeUnit?: string } | null }) {
   const variantName = item.variantSnapshot?.name;
   const size = item.variantSnapshot?.sizeValue && item.variantSnapshot?.sizeUnit
     ? `${item.variantSnapshot.sizeValue}${item.variantSnapshot.sizeUnit}`
@@ -104,13 +81,12 @@ function describeItem(item: OrderItem) {
       : null;
   const grind = item.grindOptionNameAr || item.grindOptionNameEn;
   const details = [variantName, size, form, grind].filter(Boolean).join(' · ');
-
   return details
     ? `${item.productNameSnapshot} (${details}) × ${item.quantity}`
     : `${item.productNameSnapshot} × ${item.quantity}`;
 }
 
-function normalizePhoneForWhatsApp(phone: string | null | undefined): string | null {
+function normalizePhone(phone: string | null | undefined): string | null {
   if (!phone) return null;
   let cleaned = phone.replace(/[\s\-\(\)\.]/g, '');
   if (cleaned.startsWith('+')) cleaned = cleaned.slice(1);
@@ -122,40 +98,33 @@ function normalizePhoneForWhatsApp(phone: string | null | undefined): string | n
   return null;
 }
 
-function getOrderCustomerPhone(order: Order): string | null {
+function getPhone(order: { customer: { phone: string | null } | null; guestPhone?: string | null }): string | null {
   return order.customer?.phone || order.guestPhone || null;
 }
 
-function buildWhatsAppMessage(order: Order, newStatus: OrderStatus, reason?: string): string {
+function buildMessage(order: { orderNumber: string; customer: { fullName: string } | null; guestName?: string | null }, status: OrderStatus, reason?: string): string {
   const name = order.customer?.fullName || order.guestName || 'عميل';
-  const msg = whatsappMessages[newStatus] || '';
-  return msg
-    .replace('{name}', name)
-    .replace('{orderNumber}', order.orderNumber)
-    .replace('{reason}', reason || '');
+  const msg = whatsappMessages[status] || '';
+  return msg.replace('{name}', name).replace('{orderNumber}', order.orderNumber).replace('{reason}', reason || '');
 }
 
 function openWhatsApp(phone: string, message: string) {
-  const normalized = normalizePhoneForWhatsApp(phone);
+  const normalized = normalizePhone(phone);
   if (!normalized) return;
-  const url = `https://web.whatsapp.com/send?phone=${normalized}&text=${encodeURIComponent(message)}`;
-  window.open(url, '_blank', 'noopener,noreferrer');
+  window.open(`https://web.whatsapp.com/send?phone=${normalized}&text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
 }
 
 export default function OrdersPage() {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [statusFilter, setStatusFilter] = useState<'' | OrderStatus>('PENDING');
+  const [statusFilter, setStatusFilter] = useState<'' | OrderStatus>(OrderStatus.PENDING);
   const [search, setSearch] = useState('');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [waDialog, setWaDialog] = useState<{ order: { id: string; orderNumber: string; customer: { fullName: string } | null; guestName?: string | null }; status: OrderStatus } | null>(null);
+  const [cancelReason, setCancelReason] = useState<string | null>(null);
+  const [pendingCancelId, setPendingCancelId] = useState<string | null>(null);
   const [autoWhatsApp, setAutoWhatsApp] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('br_open_whatsapp_on_status_change') !== 'false';
-    }
+    if (typeof window !== 'undefined') return localStorage.getItem('br_open_whatsapp_on_status_change') !== 'false';
     return true;
   });
 
@@ -164,87 +133,54 @@ export default function OrdersPage() {
     setTimeout(() => setToast(null), 3000);
   }, []);
 
-  useEffect(() => {
-    localStorage.setItem('br_open_whatsapp_on_status_change', String(autoWhatsApp));
-  }, [autoWhatsApp]);
+  const filters = useMemo(() => {
+    const q: Record<string, string> = { limit: '50' };
+    if (statusFilter) q.status = statusFilter;
+    if (search.trim()) q.search = search.trim();
+    if (fromDate) q.fromDate = new Date(`${fromDate}T00:00:00`).toISOString();
+    if (toDate) q.toDate = new Date(`${toDate}T23:59:59.999`).toISOString();
+    return q;
+  }, [statusFilter, search, fromDate, toDate]);
 
-  const queryString = useMemo(() => {
-    const query = new URLSearchParams({ limit: '50' });
-    if (statusFilter) query.set('status', statusFilter);
-    if (search.trim()) query.set('search', search.trim());
-    if (fromDate) query.set('fromDate', new Date(`${fromDate}T00:00:00`).toISOString());
-    if (toDate) query.set('toDate', new Date(`${toDate}T23:59:59.999`).toISOString());
-    return query.toString();
-  }, [fromDate, search, statusFilter, toDate]);
+  const { data: orders = [], isLoading, error } = useOrders(filters);
+  const updateStatus = useUpdateOrderStatus();
 
-  const loadOrders = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await adminFetch<Order[]>(`/admin/orders?${queryString}`);
-      setOrders(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'تعذر تحميل الطلبات');
-    } finally {
-      setLoading(false);
-    }
-  }, [queryString]);
-
-  useEffect(() => {
-    loadOrders();
-    const interval = setInterval(loadOrders, 30000);
-    return () => clearInterval(interval);
-  }, [loadOrders]);
-
-  const updateStatus = async (order: Order, status: OrderStatus) => {
+  const handleStatusChange = async (order: { id: string; orderNumber: string; customer: { fullName: string; phone: string | null } | null; guestName?: string | null; guestPhone?: string | null; status: OrderStatus }, newStatus: OrderStatus) => {
     let reason: string | undefined;
-    if (status === 'CANCELLED') {
+
+    if (newStatus === 'CANCELLED') {
       const input = window.prompt('اكتب سبب الإلغاء');
       if (!input?.trim()) return;
       reason = input.trim();
     }
 
-    setUpdatingId(order.id);
     try {
-      await adminFetch(`/admin/orders/${order.id}/status`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status, reason }),
-      });
-      const phone = getOrderCustomerPhone(order);
-      const statusMsg = statusLabels[status];
+      await updateStatus.mutateAsync({ id: order.id, status: newStatus, reason });
+      const statusMsg = statusLabels[newStatus];
       showToast(`تم تغيير حالة الطلب ${order.orderNumber} إلى ${statusMsg}`);
 
-      if (phone && autoWhatsApp && status !== 'PENDING') {
-        const message = buildWhatsAppMessage(order, status, reason);
-        const normalized = normalizePhoneForWhatsApp(phone);
-        if (normalized) {
-          const confirmed = window.confirm(`تم تغيير حالة الطلب. هل تريد فتح واتساب لإبلاغ العميل؟`);
-          if (confirmed) {
-            openWhatsApp(phone, message);
-            showToast(`تم فتح واتساب ويب برسالة جاهزة`);
-          }
+      const phone = getPhone(order);
+      if (phone && newStatus !== 'PENDING') {
+        if (autoWhatsApp) {
+          setWaDialog({ order, status: newStatus });
         }
-      } else if (!phone) {
-        showToast(`تم تحديث الحالة، لكن لا يوجد رقم هاتف لإرسال واتساب`);
+      } else if (!phone && newStatus !== 'PENDING') {
+        showToast(`تم تحديث الحالة، لكن لا يوجد رقم هاتف`);
       }
-
-      await loadOrders();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'تعذر تحديث حالة الطلب');
-    } finally {
-      setUpdatingId(null);
+    } catch {
+      showToast('فشل تحديث حالة الطلب');
     }
   };
 
-  const handleManualWhatsApp = (order: Order) => {
-    const phone = getOrderCustomerPhone(order);
-    if (!phone) {
-      showToast('لا يوجد رقم هاتف لإرسال واتساب');
-      return;
+  const handleWaConfirm = () => {
+    if (!waDialog) return;
+    const phone = getPhone(waDialog.order as any);
+    if (phone) {
+      const msg = buildMessage(waDialog.order, waDialog.status);
+      openWhatsApp(phone, msg);
+      showToast('تم فتح واتساب ويب برسالة جاهزة');
     }
-    const message = buildWhatsAppMessage(order, order.status);
-    openWhatsApp(phone, message);
-    showToast(`تم فتح واتساب ويب برسالة للحالة الحالية`);
+    setWaDialog(null);
   };
 
   return (
@@ -256,12 +192,9 @@ export default function OrdersPage() {
         </div>
         <div className="admin-actions-row">
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', color: 'var(--br-muted)' }}>
-            <input type="checkbox" checked={autoWhatsApp} onChange={e => setAutoWhatsApp(e.target.checked)} />
+            <input type="checkbox" checked={autoWhatsApp} onChange={e => { setAutoWhatsApp(e.target.checked); localStorage.setItem('br_open_whatsapp_on_status_change', String(e.target.checked)); }} />
             فتح واتساب تلقائياً بعد تغيير الحالة
           </label>
-          <button onClick={loadOrders} className="btn" style={{ background: 'var(--br-black)', color: 'white' }}>
-            تحديث
-          </button>
         </div>
       </div>
 
@@ -273,39 +206,38 @@ export default function OrdersPage() {
 
       <div className="card" style={{ marginBottom: 20, padding: 20 }}>
         <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-          {statuses.map(status => (
+          {statusOptions.map(opt => (
             <button
-              key={status.value || 'ALL'}
-              onClick={() => setStatusFilter(status.value)}
-              className={`btn btn-sm ${statusFilter === status.value ? 'btn-primary' : ''}`}
-              style={statusFilter === status.value ? undefined : { background: 'var(--br-cream)' }}
+              key={opt.value || 'ALL'}
+              onClick={() => setStatusFilter(opt.value)}
+              className={`btn btn-sm ${statusFilter === opt.value ? 'btn-primary' : ''}`}
+              style={statusFilter === opt.value ? undefined : { background: 'var(--br-cream)' }}
             >
-              {status.label}
+              {opt.label}
             </button>
           ))}
         </div>
-
-        <div className="admin-filter-grid" style={{ gridTemplateColumns: 'minmax(220px, 1.4fr) repeat(2, minmax(160px, 0.8fr))' }}>
-          <input className="input" placeholder="بحث برقم الطلب أو اسم العميل أو اسم الزائر" value={search} onChange={event => setSearch(event.target.value)} />
-          <input type="date" className="input" value={fromDate} onChange={event => setFromDate(event.target.value)} />
-          <input type="date" className="input" value={toDate} onChange={event => setToDate(event.target.value)} />
+        <div className="admin-filter-grid">
+          <input className="input" placeholder="بحث..." value={search} onChange={e => setSearch(e.target.value)} />
+          <input type="date" className="input" value={fromDate} onChange={e => setFromDate(e.target.value)} />
+          <input type="date" className="input" value={toDate} onChange={e => setToDate(e.target.value)} />
         </div>
       </div>
 
-      {loading && <div style={{ padding: 40, textAlign: 'center' }}>جاري تحميل الطلبات...</div>}
-      {error && !loading && <div className="card" style={{ color: 'var(--br-danger)', padding: 16 }}>{error}</div>}
+      {isLoading && <div style={{ padding: 40, textAlign: 'center' }}>جاري تحميل الطلبات...</div>}
+      {error && !isLoading && <div className="card" style={{ color: 'var(--br-danger)', padding: 16 }}>{(error as Error).message}</div>}
 
-      {!loading && !error && (
+      {!isLoading && !error && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {orders.map(order => {
-            const phone = getOrderCustomerPhone(order);
+            const phone = getPhone(order);
             return (
               <div key={order.id} className="card" style={{ padding: 20 }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 16, alignItems: 'start', marginBottom: 14 }}>
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                       <span style={{ fontWeight: 800, fontSize: 16 }}>{order.orderNumber}</span>
-                      <span className="badge" style={statusColors[order.status]}>{statusLabels[order.status]}</span>
+                      <span className="badge" style={statusColors[order.status as OrderStatus]}>{statusLabels[order.status as OrderStatus]}</span>
                     </div>
                     <div style={{ color: 'var(--br-muted)', fontSize: 13, marginTop: 6 }}>
                       {order.customer?.fullName || order.guestName || 'زائر'} · {order.customer?.phone || order.guestPhone || 'بدون رقم'} · الاستلام {formatDateTime(order.pickupTime)}
@@ -313,45 +245,45 @@ export default function OrdersPage() {
                   </div>
                   <div style={{ textAlign: 'left' }}>
                     <div style={{ fontWeight: 800, color: 'var(--br-gold)', fontSize: 18 }}>
-                      {formatMoney(order.total, order.currencyCode || 'SYP')}
+                      {order.total?.amount != null ? formatMoney(order.total.amount, order.currencyCode || 'SYP') : '-'}
                     </div>
                     <div style={{ color: 'var(--br-muted)', fontSize: 12, marginTop: 4 }}>
                       أنشئ {formatDateTime(order.createdAt)}
                     </div>
                   </div>
                 </div>
-
                 <div style={{ display: 'grid', gap: 8, marginBottom: 14 }}>
-                  {order.items.map(item => (
+                  {order.items.map((item: any) => (
                     <div key={item.id} style={{ background: 'var(--br-cream)', borderRadius: 8, padding: '10px 12px', fontSize: 14 }}>
                       {describeItem(item)}
                     </div>
                   ))}
                 </div>
-
                 {order.status === 'CANCELLED' && order.cancellationReason && (
                   <div style={{ color: 'var(--br-danger)', fontSize: 13, marginBottom: 12 }}>
                     سبب الإلغاء: {order.cancellationReason}
                   </div>
                 )}
-
                 <div className="admin-actions-row">
-                  {(nextStatusActions[order.status] || []).map(action => (
+                  {(nextStatusActions[order.status as OrderStatus] || []).map(action => (
                     <button
                       key={action.status}
-                      onClick={() => updateStatus(order, action.status)}
-                      disabled={updatingId === order.id}
+                      onClick={() => handleStatusChange(order, action.status)}
+                      disabled={updateStatus.isPending && updateStatus.variables?.id === order.id}
                       className={`btn btn-sm ${action.danger ? 'btn-danger' : 'btn-primary'}`}
                     >
-                      {updatingId === order.id ? 'جاري التحديث...' : action.label}
+                      {updateStatus.isPending && updateStatus.variables?.id === order.id ? 'جاري التحديث...' : action.label}
                     </button>
                   ))}
                   {phone && (
                     <button
-                      onClick={() => handleManualWhatsApp(order)}
+                      onClick={() => {
+                        const msg = buildMessage(order, order.status as OrderStatus);
+                        openWhatsApp(phone, msg);
+                        showToast('تم فتح واتساب ويب');
+                      }}
                       className="btn btn-sm"
                       style={{ background: '#25D366', color: '#fff' }}
-                      title="إرسال واتساب للحالة الحالية"
                     >
                       📱 واتساب
                     </button>
@@ -360,7 +292,6 @@ export default function OrdersPage() {
               </div>
             );
           })}
-
           {orders.length === 0 && (
             <div style={{ textAlign: 'center', padding: 40, color: 'var(--br-muted)' }}>
               لا توجد طلبات ضمن الفلاتر الحالية
@@ -368,6 +299,17 @@ export default function OrdersPage() {
           )}
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!waDialog}
+        title="واتساب ويب"
+        description="هل تريد فتح واتساب لإبلاغ العميل بتحديث الطلب؟"
+        confirmLabel="فتح واتساب"
+        cancelLabel="تجاهل"
+        icon="💬"
+        onConfirm={handleWaConfirm}
+        onCancel={() => setWaDialog(null)}
+      />
     </div>
   );
 }

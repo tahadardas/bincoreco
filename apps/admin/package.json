@@ -12,6 +12,8 @@
   "dependencies": {
     "@banco-ricco/config": "*",
     "@banco-ricco/types": "*",
+    "@tanstack/react-query": "^5.100.14",
+    "@tanstack/react-query-devtools": "^5.100.14",
     "next": "^14.2.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0"
