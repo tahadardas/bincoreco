@@ -227,11 +227,27 @@ export default function ProductEditPage() {
     setUploading(true);
     try {
       const result = await adminUpload(file, 'products');
-      setForm(prev => ({
-        ...prev,
-        images: [...prev.images, { url: result.url, isPrimary: prev.images.length === 0, sortOrder: prev.images.length }],
-        imageUrl: prev.images.length === 0 ? result.url : prev.imageUrl,
-      }));
+      if (!isNew && params.id) {
+        await adminFetch(`/admin/products/${params.id}/images`, {
+          method: 'POST',
+          body: JSON.stringify({ url: result.url }),
+        });
+        const product = await adminFetch<any>(`/products/${params.id}`);
+        setForm(prev => ({
+          ...prev,
+          images: (product.images || []).map((img: any) => ({
+            id: img.id, url: img.url, altAr: img.altAr || '', altEn: img.altEn || '',
+            isPrimary: img.isPrimary, sortOrder: img.sortOrder,
+          })),
+          imageUrl: product.imageUrl || prev.imageUrl,
+        }));
+      } else {
+        setForm(prev => ({
+          ...prev,
+          images: [...prev.images, { url: result.url, isPrimary: prev.images.length === 0, sortOrder: prev.images.length }],
+          imageUrl: prev.images.length === 0 ? result.url : prev.imageUrl,
+        }));
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'فشل رفع الصورة');
     } finally {
@@ -239,24 +255,57 @@ export default function ProductEditPage() {
     }
   };
 
-  const setPrimaryImage = (index: number) => {
-    const images = form.images.map((img, i) => ({
-      ...img,
-      isPrimary: i === index,
-    }));
-    setForm({ ...form, images, imageUrl: form.images[index].url });
+  const setPrimaryImage = async (index: number) => {
+    const img = form.images[index];
+    if (!img.id) {
+      setForm(prev => {
+        const images = prev.images.map((i, idx) => ({ ...i, isPrimary: idx === index }));
+        return { ...prev, images, imageUrl: prev.images[index].url };
+      });
+      return;
+    }
+    try {
+      const productId = params.id!;
+      await adminFetch(`/admin/products/${productId}/images/${img.id}/primary`, { method: 'PATCH' });
+      const product = await adminFetch<any>(`/products/${productId}`);
+      setForm(prev => ({
+        ...prev,
+        images: (product.images || []).map((i: any) => ({
+          id: i.id, url: i.url, altAr: i.altAr || '', altEn: i.altEn || '',
+          isPrimary: i.isPrimary, sortOrder: i.sortOrder,
+        })),
+        imageUrl: product.imageUrl || prev.imageUrl,
+      }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'فشل تعيين الصورة الرئيسية');
+    }
   };
 
-  const removeImage = (index: number) => {
-    const images = form.images.filter((_, i) => i !== index);
-    if (form.images[index].isPrimary && images.length > 0) {
-      images[0].isPrimary = true;
+  const removeImage = async (index: number) => {
+    const img = form.images[index];
+    if (!img.id) {
+      setForm(prev => {
+        const images = prev.images.filter((_, i) => i !== index);
+        if (prev.images[index].isPrimary && images.length > 0) images[0].isPrimary = true;
+        return { ...prev, images, imageUrl: images.find(i => i.isPrimary)?.url || (images[0]?.url || '') };
+      });
+      return;
     }
-    setForm({
-      ...form,
-      images,
-      imageUrl: images.find(img => img.isPrimary)?.url || (images[0]?.url || ''),
-    });
+    try {
+      const productId = params.id!;
+      await adminFetch(`/admin/products/${productId}/images/${img.id}`, { method: 'DELETE' });
+      const product = await adminFetch<any>(`/products/${productId}`);
+      setForm(prev => ({
+        ...prev,
+        images: (product.images || []).map((i: any) => ({
+          id: i.id, url: i.url, altAr: i.altAr || '', altEn: i.altEn || '',
+          isPrimary: i.isPrimary, sortOrder: i.sortOrder,
+        })),
+        imageUrl: product.imageUrl || prev.imageUrl,
+      }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'فشل حذف الصورة');
+    }
   };
 
   const save = async () => {
