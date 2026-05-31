@@ -24,8 +24,9 @@ export default function LocaleLayout({ children, params }: { children: ReactNode
             textAlign: 'center',
             padding: '24px',
             fontSize: 14,
+            borderTop: '1px solid rgba(201, 150, 26, 0.2)',
           }}>
-            &copy; {new Date().getFullYear()} Banco Ricco. All rights reserved.
+            &copy; {new Date().getFullYear()} Banco Ricco · {params.locale === 'ar' ? 'نحترم البن' : 'We Respect the Beans'}
           </footer>
         </AuthProvider>
       </body>

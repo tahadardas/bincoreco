@@ -314,6 +314,44 @@ async function main() {
   }
   console.log('Grind options created');
 
+  const grindLinksBySku: Record<string, string[]> = {
+    'BR-V60-COL': ['V60', 'ESPRESSO', 'AMERICAN_COFFEE', 'FRENCH_PRESS'],
+    'BR-V60-ETH': ['V60', 'ESPRESSO', 'AMERICAN_COFFEE'],
+    'BR-V60-BRA': ['V60', 'FRENCH_PRESS', 'MOKA_POT'],
+    'BR-SHAMI-001': ['TURKISH_SHAMI', 'MOKA_POT', 'ESPRESSO'],
+  };
+
+  for (const [sku, grindCodes] of Object.entries(grindLinksBySku)) {
+    const product = await prisma.product.findUnique({ where: { sku } });
+    if (!product) continue;
+
+    const linkedOptions = await prisma.grindOption.findMany({
+      where: { code: { in: grindCodes } },
+    });
+
+    for (const option of linkedOptions) {
+      await prisma.productGrindOption.upsert({
+        where: {
+          productId_grindOptionId: {
+            productId: product.id,
+            grindOptionId: option.id,
+          },
+        },
+        update: {
+          isActive: true,
+          sortOrder: option.sortOrder,
+        },
+        create: {
+          productId: product.id,
+          grindOptionId: option.id,
+          isActive: true,
+          sortOrder: option.sortOrder,
+        },
+      });
+    }
+  }
+  console.log('Product grind options linked');
+
   await prisma.setting.upsert({
     where: { key: 'default_currency' },
     update: {},
@@ -328,6 +366,11 @@ async function main() {
     where: { key: 'default_preparation_time' },
     update: {},
     create: { key: 'default_preparation_time', value: '15' },
+  });
+  await prisma.setting.upsert({
+    where: { key: 'pickup_enabled' },
+    update: {},
+    create: { key: 'pickup_enabled', value: 'true' },
   });
   await prisma.setting.upsert({
     where: { key: 'stamp_target' },

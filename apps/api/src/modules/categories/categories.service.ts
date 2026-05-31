@@ -17,6 +17,17 @@ export class CategoriesService {
     return categories;
   }
 
+  async findAllAdmin(locale?: string) {
+    return this.prisma.category.findMany({
+      where: { deletedAt: null },
+      include: {
+        translations: locale ? { where: { locale } } : true,
+        _count: { select: { products: true } },
+      },
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
+    });
+  }
+
   async findById(id: string) {
     const category = await this.prisma.category.findUnique({
       where: { id },

@@ -1,11 +1,12 @@
 'use client';
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { getDictionary, Locale } from '@/lib/dictionaries';
-import { useAuth } from '@/lib/auth-context';
 import AuthModal from '@/components/auth-modal';
+import EspressoButton from '@/components/espresso-button';
+import ProductCard, { ProductSummary } from '@/components/product-card';
+import { RevealSection } from '@/components/scroll-reveal';
 
 interface Banner {
   id: string;
@@ -15,69 +16,74 @@ interface Banner {
   translations: { locale: string; title: string | null; subtitle: string | null }[];
 }
 
-interface Product {
-  id: string;
-  sku: string;
-  type: string;
-  isBestSeller: boolean;
-  isMaestroPick: boolean;
-  isFeatured: boolean;
-  imageUrl: string | null;
-  basePreparationTimeMinutes: number;
-  translations: { locale: string; name: string; shortDescription: string | null }[];
-  variants: { id: string; name: string; prices: { amount: number; currencyCode: string }[] }[];
-  category: { translations: { locale: string; name: string }[] };
+function SectionHeader({
+  eyebrow,
+  title,
+  copy,
+}: {
+  eyebrow: string;
+  title: string;
+  copy?: string;
+}) {
+  return (
+    <div className="section-heading">
+      <div>
+        <div className="section-eyebrow">{eyebrow}</div>
+        <h2 className="section-title">{title}</h2>
+      </div>
+      {copy && <p className="section-copy">{copy}</p>}
+    </div>
+  );
 }
 
 export default function HomePage() {
   const params = useParams();
+  const router = useRouter();
   const locale = (params.locale as Locale) || 'ar';
   const dict = getDictionary(locale);
-  const { user } = useAuth();
   const [banners, setBanners] = useState<Banner[]>([]);
-  const [bestSellers, setBestSellers] = useState<Product[]>([]);
-  const [maestroPicks, setMaestroPicks] = useState<Product[]>([]);
-  const [beans, setBeans] = useState<Product[]>([]);
+  const [bestSellers, setBestSellers] = useState<ProductSummary[]>([]);
+  const [maestroPicks, setMaestroPicks] = useState<ProductSummary[]>([]);
+  const [beans, setBeans] = useState<ProductSummary[]>([]);
+  const [specialCoffee, setSpecialCoffee] = useState<ProductSummary[]>([]);
   const [showAuth, setShowAuth] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('login') === '1') setShowAuth(true);
+    const searchParams = new URLSearchParams(window.location.search);
+    if (searchParams.get('login') === '1') {
+      setShowAuth(true);
+    }
   }, []);
 
   useEffect(() => {
     Promise.all([
       api.get<Banner[]>(`/banners?locale=${locale}`),
-      api.get<Product[]>(`/products/best-sellers?locale=${locale}`),
-      api.get<Product[]>(`/products/maestro-picks?locale=${locale}`),
-      api.get<Product[]>(`/products?locale=${locale}&type=COFFEE_BEAN`),
-    ]).then(([bannerData, best, picks, beanProducts]) => {
+      api.get<ProductSummary[]>(`/products/best-sellers?locale=${locale}`),
+      api.get<ProductSummary[]>(`/products/maestro-picks?locale=${locale}`),
+      api.get<ProductSummary[]>(`/products?locale=${locale}&type=COFFEE_BEAN&limit=6`),
+      api.get<ProductSummary[]>(`/products?locale=${locale}&search=${encodeURIComponent('B.R Special')}&limit=2`),
+    ]).then(([bannerData, best, picks, beanProducts, special]) => {
       setBanners(bannerData);
       setBestSellers(best);
       setMaestroPicks(picks);
       setBeans(beanProducts);
+      setSpecialCoffee(special);
     }).catch(console.error).finally(() => setLoading(false));
   }, [locale]);
 
-  const getTranslatedName = (product: Product) =>
-    product.translations.find(t => t.locale === locale)?.name || product.translations[0]?.name || '';
-
-  const getTranslatedDesc = (product: Product) =>
-    product.translations.find(t => t.locale === locale)?.shortDescription || '';
-
-  const getPrice = (product: Product) => {
-    const v = product.variants[0];
-    if (!v || !v.prices[0]) return '';
-    const amt = v.prices[0].amount;
-    return amt.toLocaleString() + ' SYP';
+  const labels = {
+    bestSeller: dict.home.bestSellers,
+    maestroPick: dict.home.maestroPicks,
+    view: dict.home.viewDetails,
   };
 
   if (loading) {
     return (
-      <div style={{ textAlign: 'center', padding: 100 }}>
-        <div style={{ fontSize: 24, color: 'var(--br-gold)' }}>Banco Ricco</div>
-        <div style={{ marginTop: 16, color: 'var(--br-muted)' }}>Loading...</div>
+      <div className="page-shell" style={{ textAlign: 'center' }}>
+        <img src="/brand/br-monogram.png" alt="" style={{ width: 96, height: 96, objectFit: 'contain', marginBottom: 16 }} />
+        <div style={{ fontSize: 24, color: 'var(--br-gold)', fontWeight: 900 }}>Banco Ricco</div>
+        <div style={{ marginTop: 10, color: 'var(--br-muted)' }}>Loading...</div>
       </div>
     );
   }
@@ -85,114 +91,182 @@ export default function HomePage() {
   return (
     <div>
       <section style={{
-        background: 'linear-gradient(135deg, var(--br-black) 0%, var(--br-espresso) 100%)',
+        position: 'relative',
+        overflow: 'hidden',
+        background:
+          'linear-gradient(135deg, rgba(11,10,8,0.98), rgba(27,16,11,0.94)), repeating-linear-gradient(45deg, rgba(201,150,26,0.16) 0 1px, transparent 1px 18px)',
         color: 'var(--br-white)',
-        padding: '80px 16px',
-        textAlign: 'center',
+        padding: '82px 0 58px',
       }}>
-        <h1 style={{ fontSize: 48, fontWeight: 700, marginBottom: 16, color: 'var(--br-gold)' }}>
-          {dict.home.title}
-        </h1>
-        <p style={{ fontSize: 20, color: 'var(--br-cream)', marginBottom: 32, maxWidth: 600, margin: '0 auto 32px' }}>
-          {dict.home.subtitle}
-        </p>
-        <Link href={`/${locale}/products`} className="btn btn-primary">
-          {dict.home.orderNow}
-        </Link>
+        <img
+          src="/brand/br-monogram.png"
+          alt=""
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            insetInlineEnd: '7%',
+            top: 34,
+            width: 'min(34vw, 360px)',
+            opacity: 0.12,
+            filter: 'drop-shadow(0 22px 40px rgba(0,0,0,0.25))',
+          }}
+        />
+        <div className="container hero-grid" style={{ position: 'relative' }}>
+          <div>
+            <div className="section-eyebrow" style={{ color: 'var(--br-gold-light)', marginBottom: 12 }}>
+              {dict.home.heroEyebrow}
+            </div>
+            <h1 style={{ fontSize: 56, lineHeight: 1.06, fontWeight: 900, color: 'var(--br-gold-light)', marginBottom: 18 }}>
+              {dict.home.title}
+            </h1>
+            <p style={{ fontSize: 20, color: 'rgba(255,250,240,0.86)', maxWidth: 680, marginBottom: 30 }}>
+              {dict.home.subtitle}
+            </p>
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+              <EspressoButton size="large" onClick={() => router.push(`/${locale}/products`)}>
+                {dict.home.orderNow}
+              </EspressoButton>
+              <EspressoButton tone="dark" size="large" onClick={() => router.push(`/${locale}/products?maestro=1`)}>
+                {dict.home.heroSecondary}
+              </EspressoButton>
+            </div>
+          </div>
+          <div style={{
+            border: '1px solid rgba(201,150,26,0.38)',
+            borderRadius: 8,
+            padding: 20,
+            background: 'rgba(255,250,240,0.06)',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.24)',
+          }}>
+            <div style={{ aspectRatio: '1 / 1', display: 'grid', placeItems: 'center', border: '1px solid rgba(201,150,26,0.28)', borderRadius: 8 }}>
+              <img src="/brand/br-monogram.png" alt="BR Banco Ricco" style={{ width: '70%', maxHeight: '80%', objectFit: 'contain' }} />
+            </div>
+            <div style={{ marginTop: 14, color: 'rgba(255,250,240,0.8)', fontWeight: 700 }}>
+              {dict.home.respectBeans}
+            </div>
+          </div>
+        </div>
       </section>
 
       {banners.length > 0 && (
-        <section style={{ padding: '32px 16px', background: 'var(--br-white)' }}>
-          <div className="container">
+        <section style={{ padding: '30px 0 0' }}>
+          <div className="container" style={{ display: 'grid', gap: 14 }}>
             {banners.map(banner => {
-              const t = banner.translations.find(tr => tr.locale === locale);
-              const content = (
-                <div style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: 'linear-gradient(135deg, var(--br-espresso), var(--br-black))',
-                  borderRadius: 16, padding: '40px 32px', marginBottom: banner.sortOrder > 1 ? 16 : 0,
-                  minHeight: 160, textAlign: 'center', position: 'relative', overflow: 'hidden',
+              const t = banner.translations.find(item => item.locale === locale);
+              return (
+                <div key={banner.id} className="card" style={{
+                  minHeight: 150,
+                  backgroundImage: `linear-gradient(90deg, rgba(11,10,8,0.86), rgba(27,16,11,0.42)), url(${banner.imageUrl})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                  color: 'var(--br-white)',
+                  padding: 26,
+                  display: 'grid',
+                  alignContent: 'center',
                 }}>
-                  <div>
-                    {t?.title && <h2 style={{ fontSize: 28, fontWeight: 700, color: 'var(--br-gold)', marginBottom: 8 }}>{t.title}</h2>}
-                    {t?.subtitle && <p style={{ fontSize: 16, color: 'var(--br-cream)' }}>{t.subtitle}</p>}
-                  </div>
+                  <h2 style={{ color: 'var(--br-gold-light)', fontSize: 26, fontWeight: 900 }}>{t?.title}</h2>
+                  {t?.subtitle && <p style={{ marginTop: 6, maxWidth: 540 }}>{t.subtitle}</p>}
                 </div>
               );
-              return banner.linkUrl ? (
-                <Link key={banner.id} href={banner.linkUrl} style={{ textDecoration: 'none' }}>{content}</Link>
-              ) : <div key={banner.id}>{content}</div>;
             })}
           </div>
         </section>
       )}
 
       {bestSellers.length > 0 && (
-        <section style={{ padding: '64px 16px' }}>
-          <div className="container">
-            <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 32, textAlign: 'center' }}>
-              {dict.home.bestSellers}
-            </h2>
-            <div className="grid grid-2">
-              {bestSellers.map(product => (
-                <Link key={product.id} href={`/${locale}/products/${product.id}`} className="card" style={{ display: 'flex', padding: 24 }}>
-                  <div style={{ flex: 1 }}>
-                    <h3 style={{ fontSize: 20, fontWeight: 600, marginBottom: 8 }}>{getTranslatedName(product)}</h3>
-                    <p style={{ color: 'var(--br-muted)', marginBottom: 12, fontSize: 14 }}>{getTranslatedDesc(product)}</p>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--br-gold)' }}>{getPrice(product)}</span>
-                      <span className="badge badge-gold">{dict.home.orderNow}</span>
-                    </div>
-                  </div>
-                </Link>
-              ))}
+        <RevealSection>
+          <section className="page-shell">
+            <div className="container">
+              <SectionHeader eyebrow="Banco Ricco" title={dict.home.bestSellers} />
+              <div className="grid grid-3">
+                {bestSellers.slice(0, 6).map(product => (
+                  <ProductCard key={product.id} product={product} locale={locale} labels={labels} />
+                ))}
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        </RevealSection>
       )}
 
       {maestroPicks.length > 0 && (
-        <section style={{ padding: '64px 16px', background: 'var(--br-white)' }}>
-          <div className="container">
-            <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 32, textAlign: 'center' }}>
-              {dict.home.maestroPicks}
-            </h2>
-            <div className="grid grid-2">
-              {maestroPicks.map(product => (
-                <Link key={product.id} href={`/${locale}/products/${product.id}`} className="card" style={{ display: 'flex', padding: 24 }}>
-                  <div style={{ flex: 1 }}>
-                    <h3 style={{ fontSize: 20, fontWeight: 600, marginBottom: 8 }}>{getTranslatedName(product)}</h3>
-                    <p style={{ color: 'var(--br-muted)', marginBottom: 12, fontSize: 14 }}>{getTranslatedDesc(product)}</p>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--br-gold)' }}>{getPrice(product)}</span>
-                      <span className="badge badge-cream">{dict.home.viewDetails}</span>
-                    </div>
-                  </div>
-                </Link>
-              ))}
+        <RevealSection>
+          <section style={{ padding: '64px 0', background: 'rgba(255,255,255,0.45)' }}>
+            <div className="container">
+              <SectionHeader eyebrow={dict.home.respectBeans} title={dict.home.maestroPicks} />
+              <div className="grid grid-3">
+                {maestroPicks.slice(0, 6).map(product => (
+                  <ProductCard key={product.id} product={product} locale={locale} labels={labels} />
+                ))}
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        </RevealSection>
       )}
 
-      {beans.length > 0 && (
-        <section style={{ padding: '64px 16px' }}>
+      <RevealSection>
+        <section className="page-shell">
           <div className="container">
-            <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 32, textAlign: 'center' }}>
-              {dict.home.beans}
-            </h2>
+            <SectionHeader eyebrow="Coffee Bank" title={dict.home.beans} copy={dict.home.beansCopy} />
             <div className="grid grid-3">
               {beans.slice(0, 6).map(product => (
-                <Link key={product.id} href={`/${locale}/products/${product.id}`} className="card" style={{ padding: 20, textAlign: 'center' }}>
-                  <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>{getTranslatedName(product)}</h3>
-                  <p style={{ color: 'var(--br-muted)', fontSize: 14, marginBottom: 12 }}>{getTranslatedDesc(product)}</p>
-                  <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--br-gold)' }}>{getPrice(product)}</span>
-                </Link>
+                <ProductCard key={product.id} product={product} locale={locale} labels={labels} />
               ))}
             </div>
           </div>
         </section>
+      </RevealSection>
+
+      {specialCoffee.length > 0 && (
+        <RevealSection>
+          <section className="dark-section" style={{ padding: '64px 0', background: 'var(--br-espresso)', color: 'var(--br-white)' }}>
+            <div className="container">
+              <SectionHeader eyebrow="Banco Signature" title={dict.home.specialCoffee} copy={dict.home.pickupCopy} />
+              <div className="grid grid-2">
+                {specialCoffee.map(product => (
+                  <ProductCard key={product.id} product={product} locale={locale} labels={labels} />
+                ))}
+                <div style={{
+                  border: '1px solid rgba(201,150,26,0.36)',
+                  borderRadius: 8,
+                  padding: 28,
+                  display: 'grid',
+                  alignContent: 'center',
+                  gap: 14,
+                  background: 'rgba(255,250,240,0.06)',
+                }}>
+                  <h3 style={{ color: 'var(--br-gold-light)', fontSize: 24, fontWeight: 900 }}>{dict.home.pickupTitle}</h3>
+                  <p style={{ color: 'rgba(255,250,240,0.8)' }}>{dict.home.pickupCopy}</p>
+                  <EspressoButton onClick={() => router.push(`/${locale}/products`)}>
+                    {dict.home.orderNow}
+                  </EspressoButton>
+                </div>
+              </div>
+            </div>
+          </section>
+        </RevealSection>
       )}
+
+      <RevealSection>
+        <section style={{ padding: '64px 0' }}>
+          <div className="container feature-grid">
+            <div className="card" style={{ padding: 24 }}>
+              <div className="section-eyebrow">{dict.home.coinsTeaser}</div>
+              <h3 style={{ fontSize: 22, fontWeight: 900, margin: '8px 0' }}>{dict.nav.loyalty}</h3>
+              <p style={{ color: 'var(--br-muted)' }}>{dict.loyalty.subtitle}</p>
+            </div>
+            <div className="card" style={{ padding: 24 }}>
+              <div className="section-eyebrow">{dict.home.pickupTitle}</div>
+              <h3 style={{ fontSize: 22, fontWeight: 900, margin: '8px 0' }}>{dict.cart.cashOnly}</h3>
+              <p style={{ color: 'var(--br-muted)' }}>{dict.home.pickupCopy}</p>
+            </div>
+            <div className="card" style={{ padding: 24 }}>
+              <div className="section-eyebrow">{dict.home.moments}</div>
+              <h3 style={{ fontSize: 22, fontWeight: 900, margin: '8px 0' }}>{dict.home.respectBeans}</h3>
+              <p style={{ color: 'var(--br-muted)' }}>{dict.home.subtitle}</p>
+            </div>
+          </div>
+        </section>
+      </RevealSection>
 
       {showAuth && <AuthModal locale={locale} onClose={() => setShowAuth(false)} />}
     </div>

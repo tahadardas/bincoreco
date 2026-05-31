@@ -1,9 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { AppRole } from '../../common/auth/roles.decorator';
+import { AuditActions, AuditLogContext } from '../audit-logs/audit-log.types';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private auditLogs: AuditLogsService,
+  ) {}
 
   async findById(id: string) {
     return this.prisma.user.findUnique({ where: { id } });
@@ -22,6 +28,29 @@ export class UsersService {
 
   async create(data: { email: string | null; phone: string | null; passwordHash: string; fullName: string }) {
     return this.prisma.user.create({ data });
+  }
+
+  async updateRole(id: string, role: AppRole, auditContext?: AuditLogContext) {
+    const before = await this.prisma.user.findUnique({ where: { id } });
+    if (!before) {
+      throw new NotFoundException('User not found');
+    }
+
+    const after = await this.prisma.user.update({
+      where: { id },
+      data: { role },
+    });
+
+    await this.auditLogs.record({
+      ...auditContext,
+      action: AuditActions.USER_ROLE_CHANGED,
+      entityType: 'User',
+      entityId: id,
+      beforeSnapshot: { id: before.id, role: before.role },
+      afterSnapshot: { id: after.id, role: after.role },
+    });
+
+    return after;
   }
 
   async findAll(params: { page?: number; limit?: number; search?: string }) {

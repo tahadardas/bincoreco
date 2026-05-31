@@ -11,33 +11,28 @@ export default function Header() {
   const { user, logout } = useAuth();
 
   return (
-    <header style={{
-      background: 'var(--br-black)',
-      color: 'var(--br-white)',
-      padding: '16px 0',
-      position: 'sticky',
-      top: 0,
-      zIndex: 100,
-    }}>
-      <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Link href={`/${locale}`} style={{ fontSize: 24, fontWeight: 700, color: 'var(--br-gold)' }}>
-          Banco Ricco
+    <header className="br-header">
+      <div className="container br-header__inner">
+        <Link href={`/${locale}`} className="br-brand" aria-label="Banco Ricco">
+          <img src="/brand/br-monogram.png" alt="" className="br-brand__mark" />
+          <span className="br-brand__name">
+            <span className="br-brand__title">Banco Ricco</span>
+            <span className="br-brand__subtitle">{dict.home.respectBeans}</span>
+          </span>
         </Link>
-        <nav style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
+        <nav className="br-nav" aria-label="Main navigation">
           <Link href={`/${locale}`}>{dict.nav.home}</Link>
           <Link href={`/${locale}/products`}>{dict.nav.products}</Link>
           <Link href={`/${locale}/cart`}>{dict.nav.cart}</Link>
           {user && <Link href={`/${locale}/orders`}>{dict.nav.orders}</Link>}
           {user && <Link href={`/${locale}/loyalty`}>{dict.nav.loyalty}</Link>}
-          <Link href={`/${locale === 'ar' ? 'en' : 'ar'}`} style={{ color: 'var(--br-gold)' }}>
+          <Link href={`/${locale === 'ar' ? 'en' : 'ar'}`} className="lang-switch">
             {locale === 'ar' ? 'EN' : 'AR'}
           </Link>
           {user ? (
-            <button onClick={logout} style={{ background: 'none', color: 'var(--br-white)' }}>
-              {dict.nav.logout}
-            </button>
+            <button onClick={logout}>{dict.nav.logout}</button>
           ) : (
-            <Link href={`/${locale}/?login=1`} style={{ color: 'var(--br-gold)' }}>
+            <Link href={`/${locale}/?login=1`} className="lang-switch">
               {dict.nav.login}
             </Link>
           )}

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, ActivityIndicator, TouchableOpacity, TextInput } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { apiFetch } from '../lib/api';
 
 const styles = StyleSheet.create({
@@ -29,7 +30,8 @@ const styles = StyleSheet.create({
   successText: { color: '#155724' },
 });
 
-export default function LoyaltyScreen({ locale, token }: { locale: 'ar' | 'en'; token: string }) {
+export default function LoyaltyScreen({ locale, token, onLogin }: { locale: 'ar' | 'en'; token: string | null; onLogin?: (token: string) => void }) {
+  const navigation = useNavigation<any>();
   const [data, setData] = useState<any>(null);
   const [qr, setQr] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -37,6 +39,7 @@ export default function LoyaltyScreen({ locale, token }: { locale: 'ar' | 'en'; 
   const [msg, setMsg] = useState('');
 
   const load = () => {
+    if (!token) { setLoading(false); return; }
     setLoading(true);
     Promise.all([
       apiFetch<any>('/loyalty/my', { token }),
@@ -79,6 +82,24 @@ export default function LoyaltyScreen({ locale, token }: { locale: 'ar' | 'en'; 
   };
 
   if (loading) return <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}><ActivityIndicator size="large" color="#C9961A" /></View>;
+
+  if (!token) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={{ fontSize: 48, marginBottom: 16 }}>🪙</Text>
+        <Text style={{ fontSize: 20, fontWeight: '700', marginBottom: 8, color: '#0D0D0D' }}>
+          {locale === 'ar' ? 'B.R Coins' : 'B.R Coins'}
+        </Text>
+        <Text style={{ color: '#7A6A58', textAlign: 'center', marginBottom: 20, paddingHorizontal: 20 }}>
+          {locale === 'ar' ? 'سجل الدخول لجمع النقاط والطوابع مع كل طلب' : 'Login to collect coins and stamps with every order'}
+        </Text>
+        <TouchableOpacity style={styles.btn} onPress={() => navigation.navigate('Login')}>
+          <Text style={styles.btnText}>{locale === 'ar' ? 'تسجيل الدخول' : 'Login'}</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   if (!data) return <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}><Text>{locale === 'ar' ? 'لا توجد بيانات' : 'No data'}</Text></View>;
 
   const progress = Math.min(data.stampCount / data.stampTarget * 100, 100);

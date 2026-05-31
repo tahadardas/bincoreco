@@ -12,7 +12,7 @@ interface User {
 interface AuthContextType {
   user: User | null;
   token: string | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (identifier: string, password: string) => Promise<void>;
   register: (input: { email?: string; phone?: string; password: string; fullName: string }) => Promise<void>;
   logout: () => void;
   loading: boolean;
@@ -41,8 +41,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const login = async (email: string, password: string) => {
-    const result = await api.post<{ user: User; accessToken: string; refreshToken: string }>('/auth/login', { email, password });
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      setUser(null);
+      setToken(null);
+      setLoading(false);
+    };
+    window.addEventListener('banco-auth-unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('banco-auth-unauthorized', handleUnauthorized);
+  }, []);
+
+  const login = async (identifier: string, password: string) => {
+    const value = identifier.trim();
+    const credentials = value.includes('@') ? { email: value, password } : { phone: value, password };
+    const result = await api.post<{ user: User; accessToken: string; refreshToken: string }>('/auth/login', credentials);
     setUser(result.user);
     setToken(result.accessToken);
     localStorage.setItem('token', result.accessToken);

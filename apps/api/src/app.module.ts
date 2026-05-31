@@ -7,6 +7,7 @@ import { UsersModule } from './modules/users/users.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { ProductsModule } from './modules/products/products.module';
 import { GrindOptionsModule } from './modules/grind-options/grind-options.module';
+import { GuestCartModule } from './modules/guest-cart/guest-cart.module';
 import { CartModule } from './modules/cart/cart.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { ReportsModule } from './modules/reports/reports.module';
@@ -26,6 +27,7 @@ import { LoyaltyModule } from './modules/loyalty/loyalty.module';
     CategoriesModule,
     ProductsModule,
     GrindOptionsModule,
+    GuestCartModule,
     CartModule,
     OrdersModule,
     ReportsModule,

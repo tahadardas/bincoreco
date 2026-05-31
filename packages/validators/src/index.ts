@@ -1,5 +1,9 @@
 import { z } from 'zod';
 
+const dateTimeString = z.string().min(1).refine(value => !Number.isNaN(Date.parse(value)), {
+  message: 'Invalid date/time',
+});
+
 export const registerSchema = z.object({
   email: z.string().email().optional(),
   phone: z.string().min(7).max(20).optional(),
@@ -25,7 +29,7 @@ export const createCategorySchema = z.object({
   slug: z.string().min(1).max(100),
   imageUrl: z.string().url().optional(),
   isActive: z.boolean().default(true),
-  sortOrder: z.number().int().default(0),
+  sortOrder: z.coerce.number().int().default(0),
   translations: z.array(z.object({
     locale: z.enum(['ar', 'en']),
     name: z.string().min(1).max(200),
@@ -44,23 +48,25 @@ export const createProductSchema = z.object({
   isBestSeller: z.boolean().default(false),
   isMaestroPick: z.boolean().default(false),
   imageUrl: z.string().optional(),
-  basePreparationTimeMinutes: z.number().int().min(1).default(15),
-  sortOrder: z.number().int().default(0),
+  basePreparationTimeMinutes: z.coerce.number().int().min(1).default(15),
+  sortOrder: z.coerce.number().int().default(0),
+  grindOptionIds: z.array(z.string().uuid()).optional(),
   translations: z.array(z.object({
     locale: z.enum(['ar', 'en']),
     name: z.string().min(1).max(200),
     shortDescription: z.string().optional(),
     description: z.string().optional(),
+    microStory: z.string().optional(),
   })).min(1),
   variants: z.array(z.object({
     name: z.string().min(1).max(100),
-    sizeValue: z.number().optional(),
+    sizeValue: z.coerce.number().positive().optional(),
     sizeUnit: z.string().optional(),
     isActive: z.boolean().default(true),
-    sortOrder: z.number().int().default(0),
+    sortOrder: z.coerce.number().int().default(0),
     prices: z.array(z.object({
-      currencyCode: z.string().min(1).max(3),
-      amount: z.number().positive(),
+      currencyCode: z.string().min(1).max(3).transform(value => value.toUpperCase()),
+      amount: z.coerce.number().positive(),
     })).min(1),
   })).min(1),
 });
@@ -74,25 +80,51 @@ export const createGrindOptionSchema = z.object({
   descriptionAr: z.string().optional(),
   descriptionEn: z.string().optional(),
   isActive: z.boolean().default(true),
-  sortOrder: z.number().int().default(0),
+  sortOrder: z.coerce.number().int().default(0),
 });
 
 export const updateGrindOptionSchema = createGrindOptionSchema.partial();
 
+export const selectedOptionsSchema = z.object({
+  grindType: z.enum(['whole_bean', 'ground']).optional(),
+  grindOptionId: z.string().uuid().optional(),
+}).passthrough();
+
 export const addCartItemSchema = z.object({
   productId: z.string().uuid(),
   variantId: z.string().uuid().optional(),
-  quantity: z.number().int().positive().default(1),
-  selectedOptions: z.record(z.unknown()).optional(),
+  quantity: z.coerce.number().int().positive().default(1),
+  currencyCode: z.string().min(1).max(3).transform(value => value.toUpperCase()).optional(),
+  selectedOptions: selectedOptionsSchema.optional(),
 });
 
 export const updateCartItemSchema = z.object({
-  quantity: z.number().int().positive(),
+  quantity: z.coerce.number().int().positive(),
 });
 
 export const createOrderSchema = z.object({
-  pickupTime: z.string().datetime(),
+  pickupTime: dateTimeString,
+  currencyCode: z.string().min(1).max(3).transform(value => value.toUpperCase()).optional(),
   notes: z.string().optional(),
+});
+
+export const createGuestOrderSchema = z.object({
+  sessionId: z.string().min(1),
+  guestName: z.string().min(1).max(200),
+  guestPhone: z.string().min(7).max(20),
+  pickupTime: dateTimeString,
+  currencyCode: z.string().min(1).max(3).transform(value => value.toUpperCase()).optional(),
+  notes: z.string().optional(),
+});
+
+export const claimRewardSchema = z.object({
+  rewardClaimToken: z.string().min(1),
+  email: z.string().email().optional(),
+  phone: z.string().min(7).max(20).optional(),
+  password: z.string().min(6).max(100),
+  fullName: z.string().min(1).max(200),
+}).refine(data => data.email || data.phone, {
+  message: 'Email or phone is required',
 });
 
 export const updateOrderStatusSchema = z.object({
@@ -101,8 +133,8 @@ export const updateOrderStatusSchema = z.object({
 });
 
 export const reportFiltersSchema = z.object({
-  fromDate: z.string().datetime().optional(),
-  toDate: z.string().datetime().optional(),
+  fromDate: dateTimeString.optional(),
+  toDate: dateTimeString.optional(),
   productId: z.string().uuid().optional(),
   categoryId: z.string().uuid().optional(),
   status: z.string().optional(),
@@ -120,5 +152,7 @@ export type UpdateGrindOptionInput = z.infer<typeof updateGrindOptionSchema>;
 export type AddCartItemInput = z.infer<typeof addCartItemSchema>;
 export type UpdateCartItemInput = z.infer<typeof updateCartItemSchema>;
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
+export type CreateGuestOrderInput = z.infer<typeof createGuestOrderSchema>;
+export type ClaimRewardInput = z.infer<typeof claimRewardSchema>;
 export type UpdateOrderStatusInput = z.infer<typeof updateOrderStatusSchema>;
 export type ReportFiltersInput = z.infer<typeof reportFiltersSchema>;

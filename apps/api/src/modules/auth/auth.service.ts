@@ -1,6 +1,8 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
+import { v4 as uuid } from 'uuid';
+import { LoginInput, RegisterInput } from '@banco-ricco/validators';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 
@@ -12,25 +14,50 @@ export class AuthService {
     private usersService: UsersService,
   ) {}
 
-  async register(input: { email?: string; phone?: string; password: string; fullName: string }) {
+  async register(input: RegisterInput) {
     const existing = await this.usersService.findByIdentifier(input.email || input.phone || '');
     if (existing) {
       throw new ConflictException('User already exists with this email or phone');
     }
 
     const passwordHash = await bcrypt.hash(input.password, 10);
-    const user = await this.usersService.create({
-      email: input.email || null,
-      phone: input.phone || null,
-      passwordHash,
-      fullName: input.fullName,
+    const user = await this.prisma.$transaction(async tx => {
+      const createdUser = await tx.user.create({
+        data: {
+          email: input.email || null,
+          phone: input.phone || null,
+          passwordHash,
+          fullName: input.fullName,
+          role: 'customer',
+        },
+      });
+
+      const customerProfile = await tx.customerProfile.create({
+        data: { userId: createdUser.id },
+      });
+
+      await tx.loyaltyAccount.create({
+        data: { customerId: customerProfile.id },
+      });
+
+      await tx.qRCard.create({
+        data: {
+          customerId: customerProfile.id,
+          publicToken: this.generateQrPublicToken(),
+        },
+      });
+
+      return createdUser;
     });
 
     const tokens = await this.generateTokens(user.id);
-    return { user: { id: user.id, email: user.email, phone: user.phone, fullName: user.fullName }, ...tokens };
+    return {
+      user: { id: user.id, email: user.email, phone: user.phone, fullName: user.fullName, role: user.role },
+      ...tokens,
+    };
   }
 
-  async login(input: { email?: string; phone?: string; password: string }) {
+  async login(input: LoginInput) {
     const user = await this.usersService.findByIdentifier(input.email || input.phone || '');
     if (!user || !user.passwordHash) {
       throw new UnauthorizedException('Invalid credentials');
@@ -42,7 +69,18 @@ export class AuthService {
     }
 
     const tokens = await this.generateTokens(user.id);
-    return { user: { id: user.id, email: user.email, phone: user.phone, fullName: user.fullName }, ...tokens };
+    return {
+      user: { id: user.id, email: user.email, phone: user.phone, fullName: user.fullName, role: user.role },
+      ...tokens,
+    };
+  }
+
+  async adminLogin(input: LoginInput) {
+    const result = await this.login(input);
+    if (result.user.role === 'customer') {
+      throw new ForbiddenException('هذا الحساب لا يملك صلاحية دخول لوحة التحكم');
+    }
+    return result;
   }
 
   async refresh(refreshToken: string) {
@@ -67,5 +105,9 @@ export class AuthService {
       expiresIn: process.env.JWT_REFRESH_EXPIRATION || '7d',
     });
     return { accessToken, refreshToken };
+  }
+
+  private generateQrPublicToken() {
+    return uuid().replace(/-/g, '').substring(0, 20);
   }
 }

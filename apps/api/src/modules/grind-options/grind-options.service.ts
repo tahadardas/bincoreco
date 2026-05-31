@@ -1,9 +1,15 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { UpdateGrindOptionInput } from '@banco-ricco/validators';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuditActions, AuditLogContext } from '../audit-logs/audit-log.types';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 @Injectable()
 export class GrindOptionsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private auditLogs: AuditLogsService,
+  ) {}
 
   async findAll() {
     return this.prisma.grindOption.findMany({
@@ -36,13 +42,38 @@ export class GrindOptionsService {
     return this.prisma.grindOption.create({ data });
   }
 
-  async update(id: string, data: any) {
-    await this.findById(id);
-    return this.prisma.grindOption.update({ where: { id }, data });
+  async update(id: string, data: UpdateGrindOptionInput, auditContext?: AuditLogContext) {
+    const before = await this.findById(id);
+    const after = await this.prisma.grindOption.update({ where: { id }, data });
+
+    await this.auditLogs.record({
+      ...auditContext,
+      action: AuditActions.GRIND_OPTION_UPDATED,
+      entityType: 'GrindOption',
+      entityId: id,
+      beforeSnapshot: before,
+      afterSnapshot: after,
+    });
+
+    return after;
   }
 
-  async remove(id: string) {
-    await this.findById(id);
-    return this.prisma.grindOption.delete({ where: { id } });
+  async remove(id: string, auditContext?: AuditLogContext) {
+    const before = await this.findById(id);
+    const after = await this.prisma.grindOption.update({
+      where: { id },
+      data: { isActive: false },
+    });
+
+    await this.auditLogs.record({
+      ...auditContext,
+      action: AuditActions.GRIND_OPTION_UPDATED,
+      entityType: 'GrindOption',
+      entityId: id,
+      beforeSnapshot: before,
+      afterSnapshot: after,
+    });
+
+    return after;
   }
 }

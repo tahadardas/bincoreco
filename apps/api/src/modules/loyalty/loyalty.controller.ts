@@ -1,8 +1,23 @@
-import { Controller, Get, Post, Param, Body, Query, UseGuards, Req, InternalServerErrorException } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, Query, UseGuards, Req } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
+import { z } from 'zod';
 import { LoyaltyService } from './loyalty.service';
 import { successResponse, paginatedResponse } from '../../common/response.interface';
+import { AuthenticatedRequest } from '../../common/auth/authenticated-request.type';
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
+
+const loyaltyTransactionsQuerySchema = z.object({
+  page: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().positive().max(100).optional(),
+});
+
+const redeemPointsSchema = z.object({
+  points: z.coerce.number().int().positive(),
+});
+
+type LoyaltyTransactionsQuery = z.infer<typeof loyaltyTransactionsQuerySchema>;
+type RedeemPointsInput = z.infer<typeof redeemPointsSchema>;
 
 @ApiTags('Loyalty')
 @Controller()
@@ -12,7 +27,7 @@ export class LoyaltyController {
   @Get('loyalty/my')
   @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
-  async getMyAccount(@Req() req: any) {
+  async getMyAccount(@Req() req: AuthenticatedRequest) {
     const result = await this.loyaltyService.getMyAccount(req.user.id);
     return successResponse(result);
   }
@@ -20,7 +35,11 @@ export class LoyaltyController {
   @Get('loyalty/transactions')
   @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
-  async getTransactions(@Req() req: any, @Query('page') page?: number, @Query('limit') limit?: number) {
+  async getTransactions(
+    @Req() req: AuthenticatedRequest,
+    @Query(new ZodValidationPipe(loyaltyTransactionsQuerySchema)) query: LoyaltyTransactionsQuery,
+  ) {
+    const { page, limit } = query;
     const result = await this.loyaltyService.getTransactions(req.user.id, page || 1, limit || 20);
     return paginatedResponse(result.items, result.total, result.page, result.limit);
   }
@@ -28,7 +47,7 @@ export class LoyaltyController {
   @Post('loyalty/redeem-stamp')
   @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
-  async redeemStamp(@Req() req: any) {
+  async redeemStamp(@Req() req: AuthenticatedRequest) {
     const result = await this.loyaltyService.redeemStampReward(req.user.id);
     return successResponse(result, 'Stamp reward redeemed!');
   }
@@ -36,7 +55,10 @@ export class LoyaltyController {
   @Post('loyalty/redeem-points')
   @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
-  async redeemPoints(@Req() req: any, @Body() input: { points: number }) {
+  async redeemPoints(
+    @Req() req: AuthenticatedRequest,
+    @Body(new ZodValidationPipe(redeemPointsSchema)) input: RedeemPointsInput,
+  ) {
     const result = await this.loyaltyService.redeemPoints(req.user.id, input.points);
     return successResponse(result, 'Points redeemed!');
   }
@@ -44,7 +66,7 @@ export class LoyaltyController {
   @Get('loyalty/qr')
   @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
-  async getQR(@Req() req: any) {
+  async getQR(@Req() req: AuthenticatedRequest) {
     const result = await this.loyaltyService.getQR(req.user.id);
     return successResponse(result);
   }
@@ -52,7 +74,7 @@ export class LoyaltyController {
   @Post('loyalty/qr/regenerate')
   @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
-  async regenerateQR(@Req() req: any) {
+  async regenerateQR(@Req() req: AuthenticatedRequest) {
     const result = await this.loyaltyService.regenerateQR(req.user.id);
     return successResponse(result, 'QR regenerated');
   }

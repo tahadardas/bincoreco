@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { getDictionary, Locale } from '@/lib/dictionaries';
+import EspressoButton from './espresso-button';
 
 export default function AuthModal({ locale, onClose }: { locale: Locale; onClose: () => void }) {
   const dict = getDictionary(locale);
@@ -17,6 +18,10 @@ export default function AuthModal({ locale, onClose }: { locale: Locale; onClose
     e.preventDefault();
     setError('');
     try {
+      if (!email.trim() && !phone.trim()) {
+        setError(locale === 'ar' ? 'أدخل البريد الإلكتروني أو رقم الهاتف' : 'Enter email or phone');
+        return;
+      }
       if (isLogin) {
         await login(email || phone, password);
       } else {
@@ -30,15 +35,16 @@ export default function AuthModal({ locale, onClose }: { locale: Locale; onClose
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+      position: 'fixed', inset: 0, background: 'rgba(11,10,8,0.72)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200,
+      padding: 18,
     }} onClick={onClose}>
-      <div style={{
-        background: 'var(--br-white)', borderRadius: 16, padding: 32,
-        width: '100%', maxWidth: 400, position: 'relative',
+      <div className="card" style={{
+        background: 'var(--br-porcelain)', padding: 30,
+        width: '100%', maxWidth: 420, position: 'relative',
       }} onClick={e => e.stopPropagation()}>
         <button onClick={onClose} style={{
-          position: 'absolute', top: 12, right: 12, background: 'none', fontSize: 24,
+          position: 'absolute', top: 12, insetInlineEnd: 12, background: 'none', fontSize: 24,
         }}>&times;</button>
         <h2 style={{ fontSize: 24, fontWeight: 700, marginBottom: 24, textAlign: 'center' }}>
           {isLogin ? dict.auth.login : dict.auth.register}
@@ -50,7 +56,7 @@ export default function AuthModal({ locale, onClose }: { locale: Locale; onClose
               value={fullName}
               onChange={e => setFullName(e.target.value)}
               required
-              style={{ padding: 12, borderRadius: 8, border: '1px solid #ddd', fontSize: 16 }}
+              className="input"
             />
           )}
           <input
@@ -58,14 +64,14 @@ export default function AuthModal({ locale, onClose }: { locale: Locale; onClose
             type="email"
             value={email}
             onChange={e => setEmail(e.target.value)}
-            style={{ padding: 12, borderRadius: 8, border: '1px solid #ddd', fontSize: 16 }}
+            className="input"
           />
           <input
             placeholder={dict.auth.phone}
             type="tel"
             value={phone}
             onChange={e => setPhone(e.target.value)}
-            style={{ padding: 12, borderRadius: 8, border: '1px solid #ddd', fontSize: 16 }}
+            className="input"
           />
           <input
             placeholder={dict.auth.password}
@@ -73,12 +79,12 @@ export default function AuthModal({ locale, onClose }: { locale: Locale; onClose
             value={password}
             onChange={e => setPassword(e.target.value)}
             required
-            style={{ padding: 12, borderRadius: 8, border: '1px solid #ddd', fontSize: 16 }}
+            className="input"
           />
           {error && <div style={{ color: 'var(--br-danger)', fontSize: 14 }}>{error}</div>}
-          <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>
+          <EspressoButton type="submit" style={{ width: '100%' }}>
             {isLogin ? dict.auth.loginBtn : dict.auth.registerBtn}
-          </button>
+          </EspressoButton>
         </form>
         <div style={{ textAlign: 'center', marginTop: 16, fontSize: 14, color: 'var(--br-muted)' }}>
           <button onClick={() => setIsLogin(!isLogin)} style={{ background: 'none', color: 'var(--br-gold)' }}>

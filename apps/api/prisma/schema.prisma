@@ -114,7 +114,9 @@ model Product {
   translations ProductTranslation[]
   variants     ProductVariant[]
   coffeeProfile CoffeeProfile?
+  grindOptions ProductGrindOption[]
   cartItems    CartItem[]
+  guestCartItems GuestCartItem[]
   orderItems   OrderItem[]
 
   @@map("products")
@@ -143,9 +145,10 @@ model ProductVariant {
   isActive  Boolean @default(true)
   sortOrder Int     @default(0)
 
-  prices       Price[]
-  cartItems    CartItem[]
-  orderItems   OrderItem[]
+  prices         Price[]
+  cartItems      CartItem[]
+  guestCartItems GuestCartItem[]
+  orderItems     OrderItem[]
 
   @@map("product_variants")
 }
@@ -155,7 +158,7 @@ model Price {
   productVariantId String
   productVariant   ProductVariant @relation(fields: [productVariantId], references: [id], onDelete: Cascade)
   currencyCode     String
-  amount           Float
+  amount           Decimal        @db.Decimal(12, 2)
   isActive         Boolean        @default(true)
 
   @@map("prices")
@@ -191,13 +194,31 @@ model GrindOption {
   isActive      Boolean @default(true)
   sortOrder     Int     @default(0)
 
+  products ProductGrindOption[]
+
   @@map("grind_options")
+}
+
+model ProductGrindOption {
+  productId     String
+  product       Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  grindOptionId String
+  grindOption   GrindOption @relation(fields: [grindOptionId], references: [id], onDelete: Restrict)
+  isActive      Boolean     @default(true)
+  sortOrder     Int         @default(0)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@id([productId, grindOptionId])
+  @@index([grindOptionId])
+  @@map("product_grind_options")
 }
 
 model Cart {
   id         String   @id @default(uuid())
   customerId String   @unique
   customer   User     @relation(fields: [customerId], references: [id])
+  currencyCode String @default("SYP")
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -220,17 +241,50 @@ model CartItem {
   @@map("cart_items")
 }
 
+model GuestCart {
+  id          String   @id @default(uuid())
+  sessionId   String   @unique
+  currencyCode String  @default("SYP")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items GuestCartItem[]
+
+  @@map("guest_carts")
+}
+
+model GuestCartItem {
+  id              String          @id @default(uuid())
+  guestCartId     String
+  guestCart       GuestCart       @relation(fields: [guestCartId], references: [id], onDelete: Cascade)
+  productId       String
+  product         Product         @relation(fields: [productId], references: [id])
+  variantId       String?
+  variant         ProductVariant? @relation(fields: [variantId], references: [id])
+  quantity        Int             @default(1)
+  selectedOptions Json?
+
+  @@map("guest_cart_items")
+}
+
 model Order {
   id                  String      @id @default(uuid())
   orderNumber         String      @unique
-  customerId          String
-  customer            User        @relation(fields: [customerId], references: [id])
+  customerId          String?
+  customer            User?       @relation(fields: [customerId], references: [id])
+  guestName           String?
+  guestPhone          String?
+  guestSessionId      String?
+  rewardClaimToken    String?     @unique
+  rewardClaimedAt     DateTime?
+  pendingCoins        Int         @default(0)
+  pendingStamps       Int         @default(0)
   status              OrderStatus @default(PENDING)
   currencyCode        String      @default("SYP")
-  subtotal            Float       @default(0)
-  discountTotal       Float       @default(0)
+  subtotal            Decimal     @default(0) @db.Decimal(12, 2)
+  discountTotal       Decimal     @default(0) @db.Decimal(12, 2)
   loyaltyPointsUsed   Int         @default(0)
-  total               Float       @default(0)
+  total               Decimal     @default(0) @db.Decimal(12, 2)
   paymentMethod       String      @default("cash")
   paymentStatus       PaymentStatus @default(PENDING)
   pickupTime          DateTime
@@ -256,9 +310,14 @@ model OrderItem {
   productNameSnapshot    String
   variantSnapshot        Json?
   selectedOptionsSnapshot Json?
-  unitPrice              Float
+  grindType              String?
+  grindOptionId          String?
+  grindOptionNameAr      String?
+  grindOptionNameEn      String?
+  unitPrice              Decimal        @db.Decimal(12, 2)
+  currencyCode           String         @default("SYP")
   quantity               Int
-  total                  Float
+  total                  Decimal        @db.Decimal(12, 2)
 
   @@map("order_items")
 }

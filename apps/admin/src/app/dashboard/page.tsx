@@ -1,53 +1,129 @@
 'use client';
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { adminFetch } from '@/lib/api';
+import { formatMoney, MoneyAmount } from '@/lib/money';
+
+interface TopProduct {
+  productId: string;
+  productName: string;
+  sku: string;
+  currencyCode: string;
+  totalQuantity: number;
+  totalRevenue: MoneyAmount;
+}
 
 interface DashboardData {
   todayOrders: number;
-  todayRevenue: number;
+  todayRevenue: MoneyAmount;
   pendingOrders: number;
   preparingOrders: number;
   totalActiveProducts: number;
   totalCustomers: number;
+  topProducts: TopProduct[];
+}
+
+function StatCard({
+  label,
+  value,
+  tone = 'gold',
+}: {
+  label: string;
+  value: string | number;
+  tone?: 'gold' | 'warning' | 'coffee' | 'neutral';
+}) {
+  const colorMap = {
+    gold: 'var(--br-gold)',
+    warning: 'var(--br-warning)',
+    coffee: 'var(--br-coffee)',
+    neutral: 'var(--br-black)',
+  };
+
+  return (
+    <div className="card" style={{ textAlign: 'center' }}>
+      <div style={{ fontSize: 34, fontWeight: 700, color: colorMap[tone] }}>{value}</div>
+      <div style={{ color: 'var(--br-muted)', fontSize: 14, marginTop: 8 }}>{label}</div>
+    </div>
+  );
 }
 
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    adminFetch<DashboardData>('/admin/dashboard').then(setData).catch(console.error);
+    adminFetch<DashboardData>('/admin/dashboard')
+      .then(setData)
+      .catch(err => setError(err instanceof Error ? err.message : 'تعذر تحميل لوحة التحكم'));
   }, []);
 
-  if (!data) return <div style={{ padding: 40 }}>جاري التحميل...</div>;
+  if (error) {
+    return <div className="card" style={{ color: 'var(--br-danger)' }}>{error}</div>;
+  }
+
+  if (!data) {
+    return <div style={{ padding: 40 }}>جاري تحميل لوحة التحكم...</div>;
+  }
 
   return (
-    <div>
-      <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 32 }}>لوحة التحكم</h1>
+    <div dir="rtl">
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center', marginBottom: 28, flexWrap: 'wrap' }}>
+        <div>
+          <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 6 }}>لوحة التحكم</h1>
+          <p style={{ color: 'var(--br-muted)', fontSize: 14 }}>نظرة اليوم التشغيلية للطلبات والمبيعات.</p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <Link href="/dashboard/orders" className="btn btn-primary">إدارة الطلبات</Link>
+          <Link href="/dashboard/products" className="btn" style={{ background: 'var(--br-black)', color: 'white' }}>إدارة المنتجات</Link>
+        </div>
+      </div>
+
       <div className="grid-stats">
-        <div className="card" style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 36, fontWeight: 700, color: 'var(--br-gold)' }}>{data.todayOrders}</div>
-          <div style={{ color: 'var(--br-muted)', fontSize: 14, marginTop: 8 }}>طلبات اليوم</div>
+        <StatCard label="طلبات اليوم" value={data.todayOrders} />
+        <StatCard label="مبيعات اليوم" value={formatMoney(data.todayRevenue)} />
+        <StatCard label="طلبات معلقة" value={data.pendingOrders} tone="warning" />
+        <StatCard label="قيد التحضير" value={data.preparingOrders} tone="coffee" />
+        <StatCard label="منتجات نشطة" value={data.totalActiveProducts} tone="neutral" />
+        <StatCard label="عملاء" value={data.totalCustomers} tone="neutral" />
+      </div>
+
+      <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+          <div>
+            <h2 style={{ fontSize: 20, fontWeight: 700 }}>أفضل 5 منتجات اليوم</h2>
+            <p style={{ color: 'var(--br-muted)', fontSize: 13, marginTop: 4 }}>محسوبة من عناصر الطلب المخزنة، مع استبعاد الطلبات الملغاة.</p>
+          </div>
+          <Link href="/dashboard/reports" className="btn btn-sm" style={{ background: 'var(--br-cream)' }}>التقارير</Link>
         </div>
-        <div className="card" style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 36, fontWeight: 700, color: 'var(--br-gold)' }}>{data.todayRevenue.toLocaleString()}</div>
-          <div style={{ color: 'var(--br-muted)', fontSize: 14, marginTop: 8 }}>مبيعات اليوم (SYP)</div>
-        </div>
-        <div className="card" style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 36, fontWeight: 700, color: 'var(--br-warning)' }}>{data.pendingOrders}</div>
-          <div style={{ color: 'var(--br-muted)', fontSize: 14, marginTop: 8 }}>طلبات معلقة</div>
-        </div>
-        <div className="card" style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 36, fontWeight: 700, color: 'var(--br-coffee)' }}>{data.preparingOrders}</div>
-          <div style={{ color: 'var(--br-muted)', fontSize: 14, marginTop: 8 }}>قيد التحضير</div>
-        </div>
-        <div className="card" style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 36, fontWeight: 700 }}>{data.totalActiveProducts}</div>
-          <div style={{ color: 'var(--br-muted)', fontSize: 14, marginTop: 8 }}>منتجات نشطة</div>
-        </div>
-        <div className="card" style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 36, fontWeight: 700 }}>{data.totalCustomers}</div>
-          <div style={{ color: 'var(--br-muted)', fontSize: 14, marginTop: 8 }}>عملاء</div>
-        </div>
+        <table className="table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>المنتج</th>
+              <th>SKU</th>
+              <th>الكمية</th>
+              <th>الإيرادات</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.topProducts.map((product, index) => (
+              <tr key={`${product.productId}-${product.currencyCode}`}>
+                <td>{index + 1}</td>
+                <td style={{ fontWeight: 700 }}>{product.productName}</td>
+                <td style={{ fontFamily: 'monospace', fontSize: 13 }}>{product.sku}</td>
+                <td>{product.totalQuantity}</td>
+                <td style={{ fontWeight: 700, color: 'var(--br-gold)' }}>{formatMoney(product.totalRevenue, product.currencyCode)}</td>
+              </tr>
+            ))}
+            {data.topProducts.length === 0 && (
+              <tr>
+                <td colSpan={5} style={{ textAlign: 'center', color: 'var(--br-muted)', padding: 28 }}>
+                  لا توجد مبيعات مكتملة اليوم حتى الآن
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );

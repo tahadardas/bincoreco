@@ -14,18 +14,21 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     try {
-      const res = await fetch(`${API_URL}/auth/login`, {
+      const res = await fetch(`${API_URL}/auth/admin/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.message);
+      if (data.data.user.role === 'customer') {
+        throw new Error('هذا الحساب لا يملك صلاحية دخول لوحة التحكم');
+      }
       localStorage.setItem('admin_token', data.data.accessToken);
       localStorage.setItem('admin_user', JSON.stringify(data.data.user));
       router.push('/dashboard');
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'تعذر تسجيل الدخول');
     }
   };
 

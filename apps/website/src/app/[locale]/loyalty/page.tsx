@@ -1,9 +1,19 @@
 'use client';
+import { CSSProperties } from 'react';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { getDictionary, Locale } from '@/lib/dictionaries';
 import { useAuth } from '@/lib/auth-context';
+import EspressoButton from '@/components/espresso-button';
+
+interface LoyaltyTransaction {
+  id: string;
+  type: string;
+  points: number;
+  reason?: string | null;
+  createdAt: string;
+}
 
 interface LoyaltyData {
   id: string;
@@ -11,11 +21,17 @@ interface LoyaltyData {
   stampCount: number;
   stampTotalEarned: number;
   stampTarget: number;
-  transactions: any[];
+  transactions: LoyaltyTransaction[];
 }
 
 interface QRCard {
   publicToken: string;
+}
+
+function formatDate(value: string, locale: Locale) {
+  return new Intl.DateTimeFormat(locale === 'ar' ? 'ar-SY' : 'en-US', {
+    dateStyle: 'medium',
+  }).format(new Date(value));
 }
 
 export default function LoyaltyPage() {
@@ -29,43 +45,61 @@ export default function LoyaltyPage() {
   const [loading, setLoading] = useState(true);
   const [redeemPoints, setRedeemPoints] = useState(0);
   const [msg, setMsg] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [celebrate, setCelebrate] = useState(false);
+
+  const load = async (authToken: string) => {
+    const [loyalty, qrCard] = await Promise.all([
+      api.get<LoyaltyData>('/loyalty/my', authToken),
+      api.get<QRCard>('/loyalty/qr', authToken),
+    ]);
+    setData(loyalty);
+    setQr(qrCard);
+  };
 
   useEffect(() => {
-    if (!token) { router.push(`/${locale}/?login=1`); return; }
-    Promise.all([
-      api.get<LoyaltyData>('/loyalty/my'),
-      api.get<QRCard>('/loyalty/qr'),
-    ]).then(([d, q]) => {
-      setData(d);
-      setQr(q);
-    }).catch(console.error).finally(() => setLoading(false));
+    if (!token) {
+      router.push(`/${locale}/?login=1`);
+      return;
+    }
+    load(token)
+      .catch(err => setError(err instanceof Error ? err.message : 'Unable to load loyalty'))
+      .finally(() => setLoading(false));
   }, [token, locale, router]);
 
   const handleRedeemStamp = async () => {
+    if (!token) return;
     try {
-      await api.post('/loyalty/redeem-stamp', {}, token!);
+      await api.post('/loyalty/redeem-stamp', {}, token);
       setMsg(dict.loyalty.success);
-      const d = await api.get<LoyaltyData>('/loyalty/my');
-      setData(d);
-    } catch (err: any) { alert(err.message); }
+      setCelebrate(true);
+      setTimeout(() => setCelebrate(false), 3000);
+      await load(token);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : dict.loyalty.needMoreStamps);
+    }
   };
 
   const handleRedeemPoints = async () => {
-    if (!redeemPoints || redeemPoints < 1) return;
+    if (!token || !redeemPoints || redeemPoints < 1) return;
     try {
-      await api.post('/loyalty/redeem-points', { points: redeemPoints }, token!);
+      await api.post('/loyalty/redeem-points', { points: redeemPoints }, token);
       setMsg(dict.loyalty.success);
-      const d = await api.get<LoyaltyData>('/loyalty/my');
-      setData(d);
       setRedeemPoints(0);
-    } catch (err: any) { alert(err.message); }
+      await load(token);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to redeem points');
+    }
   };
 
   const handleRegenerateQR = async () => {
+    if (!token) return;
     try {
-      const q = await api.post<QRCard>('/loyalty/qr/regenerate', {}, token!);
+      const q = await api.post<QRCard>('/loyalty/qr/regenerate', {}, token);
       setQr(q);
-    } catch (err: any) { alert(err.message); }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to regenerate QR');
+    }
   };
 
   const getTypeLabel = (type: string) => {
@@ -74,105 +108,234 @@ export default function LoyaltyPage() {
       REDEEM: dict.loyalty.redeemed,
       STAMP: dict.loyalty.stamp,
       STAMP_REDEEM: dict.loyalty.stampRedeemed,
+      ADMIN_ADJUST: dict.loyalty.points,
+      ADMIN_STAMP: dict.loyalty.stamps,
     };
     return map[type] || type;
   };
 
-  if (loading) return <div style={{ textAlign: 'center', padding: 80 }}>Loading...</div>;
-  if (!data) return <div style={{ textAlign: 'center', padding: 80 }}>Not available</div>;
+  if (!user) return null;
+  if (loading) return <div className="page-shell" style={{ textAlign: 'center' }}>Loading...</div>;
+  if (!data) return <div className="page-shell" style={{ textAlign: 'center' }}>{error || 'Not available'}</div>;
 
-  const progress = Math.min(data.stampCount / data.stampTarget * 100, 100);
+  const progress = Math.min((data.stampCount / data.stampTarget) * 100, 100);
+
+  const sectionCard: CSSProperties = {
+    padding: 28, borderRadius: 16,
+    background: 'linear-gradient(135deg, var(--br-porcelain), #f7f3ed)',
+    border: '1px solid var(--br-line)',
+  };
+
+  const headingRow: CSSProperties = {
+    display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20,
+  };
 
   return (
-    <div className="container" style={{ paddingTop: 32, paddingBottom: 64 }}>
-      <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 8 }}>{dict.loyalty.title}</h1>
-      <p style={{ color: 'var(--br-muted)', marginBottom: 32 }}>{dict.loyalty.subtitle}</p>
-
-      {msg && (
-        <div style={{ background: '#d4edda', color: '#155724', padding: '12px 16px', borderRadius: 8, marginBottom: 16 }}>
-          {msg}
-        </div>
-      )}
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 32 }}>
-        <div className="card" style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 48, fontWeight: 700, color: 'var(--br-gold)' }}>{data.stampCount}</div>
-          <div style={{ fontSize: 14, color: 'var(--br-muted)', marginBottom: 16 }}>{dict.loyalty.stamps}</div>
-          <div style={{ background: '#eee', borderRadius: 8, height: 12, overflow: 'hidden', marginBottom: 8 }}>
-            <div style={{ width: `${progress}%`, background: 'var(--br-gold)', height: '100%', borderRadius: 8 }} />
-          </div>
-          <div style={{ fontSize: 13, color: 'var(--br-muted)' }}>{data.stampCount}/{data.stampTarget} {dict.loyalty.stampTarget}</div>
-          {data.stampCount >= data.stampTarget && (
-            <button onClick={handleRedeemStamp} className="btn btn-primary" style={{ marginTop: 16 }}>
-              {dict.loyalty.redeemStamp}
-            </button>
-          )}
-        </div>
-
-        <div className="card" style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 48, fontWeight: 700, color: 'var(--br-coffee)' }}>{data.balance}</div>
-          <div style={{ fontSize: 14, color: 'var(--br-muted)', marginBottom: 16 }}>{dict.loyalty.points}</div>
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-            <input type="number" className="input" style={{ width: 100 }} value={redeemPoints || ''}
-              onChange={e => setRedeemPoints(parseInt(e.target.value) || 0)}
-              placeholder={dict.loyalty.enterPoints} />
-            <button onClick={handleRedeemPoints} className="btn btn-outline" disabled={!redeemPoints || redeemPoints > data.balance}>
-              {dict.loyalty.redeemPoints}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="card" style={{ marginBottom: 32 }}>
-        <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 16 }}>{dict.loyalty.qrCard}</h3>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
-          <div style={{
-            width: 160, height: 160, background: 'var(--br-white)', border: '2px solid #ddd',
-            borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 14, fontFamily: 'monospace', color: 'var(--br-muted)',
-          }}>
-            {qr?.publicToken || '---'}
-          </div>
+    <div className="page-shell">
+      <div className="container">
+        <div className="section-heading">
           <div>
-            <p style={{ fontSize: 14, color: 'var(--br-muted)', marginBottom: 12 }}>{dict.loyalty.qrHint}</p>
-            <button onClick={handleRegenerateQR} className="btn btn-sm btn-outline">{dict.loyalty.regenerate}</button>
+            <div className="section-eyebrow">Banco Ricco</div>
+            <h1 className="section-title">{dict.loyalty.title}</h1>
+          </div>
+          <p className="section-copy">{dict.loyalty.subtitle}</p>
+        </div>
+
+        {msg && (
+          <div style={{ padding: 14, background: 'var(--br-success)', color: '#fff', borderRadius: 8, marginBottom: 16, fontWeight: 800 }}>
+            {msg}
+          </div>
+        )}
+        {error && (
+          <div style={{ padding: 14, background: 'var(--br-danger)', color: '#fff', borderRadius: 8, marginBottom: 16, fontWeight: 800 }}>
+            {error}
+          </div>
+        )}
+
+        {/* Stamps + Points cards in a 2-col grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 28 }} className="loyalty-grid">
+          {/* Stamps Card */}
+          <div className="card" style={{
+            ...sectionCard, textAlign: 'center',
+            background: 'linear-gradient(180deg, #faf6ef, #ede4d3)',
+          }}>
+            <div style={headingRow}>
+              <span style={{ fontSize: 28 }}>🪙</span>
+              <div>
+                <div className="section-eyebrow">{dict.loyalty.yourStamps}</div>
+                <div style={{ fontSize: 36, fontWeight: 900, color: 'var(--br-gold-dark)' }}>
+                  {data.stampCount}
+                  <span style={{ fontSize: 18, color: 'var(--br-muted)', fontWeight: 400 }}>
+                    {' '}/ {data.stampTarget}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="meter" style={{ '--value': `${progress}%` } as CSSProperties}>
+              <span />
+            </div>
+
+            {/* Stamp circles */}
+            <div style={{ display: 'flex', gap: 6, justifyContent: 'center', marginTop: 16, flexWrap: 'wrap' }}>
+              {Array.from({ length: data.stampTarget }, (_, i) => (
+                <div key={i} className={i < data.stampCount ? 'stamp-pop' : ''} style={{
+                  width: 32, height: 32, borderRadius: '50%',
+                  animationDelay: `${i * 0.06}s`,
+                  background: i < data.stampCount
+                    ? 'linear-gradient(135deg, var(--br-gold), #c9a84c)'
+                    : 'var(--br-line)',
+                  color: i < data.stampCount ? '#fff' : 'var(--br-muted)',
+                  display: 'grid', placeItems: 'center',
+                  fontSize: 14, fontWeight: 700,
+                  boxShadow: i < data.stampCount ? '0 2px 8px rgba(196, 161, 72, 0.4)' : 'none',
+                }}>
+                  {i < data.stampCount ? '☕' : i + 1}
+                </div>
+              ))}
+            </div>
+
+            {data.stampCount >= data.stampTarget && (
+              <div style={{ marginTop: 18 }}>
+                <EspressoButton onClick={handleRedeemStamp} tone="gold">
+                  {dict.loyalty.redeemStamp}
+                </EspressoButton>
+              </div>
+            )}
+          </div>
+
+          {/* Points Card */}
+          <div className="card" style={{
+            ...sectionCard, textAlign: 'center',
+            background: 'linear-gradient(135deg, #2c1810, #3d2317)',
+            color: '#fff',
+          }}>
+            <div style={headingRow}>
+              <span style={{ fontSize: 28 }}>🪙</span>
+              <div>
+                <div className="section-eyebrow" style={{ color: 'rgba(255,255,255,0.7)' }}>
+                  {dict.loyalty.yourPoints}
+                </div>
+                <div style={{ fontSize: 36, fontWeight: 900, color: 'var(--br-gold)' }}>
+                  {data.balance}
+                </div>
+              </div>
+            </div>
+
+            <div style={{
+              display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap', justifyContent: 'center',
+            }}>
+              <input
+                type="number"
+                className="input"
+                style={{ maxWidth: 130, background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}
+                value={redeemPoints || ''}
+                onChange={event => setRedeemPoints(parseInt(event.target.value) || 0)}
+                placeholder={dict.loyalty.enterPoints}
+              />
+              <button
+                onClick={handleRedeemPoints}
+                className="btn btn-outline"
+                style={{ color: 'var(--br-gold)', borderColor: 'var(--br-gold)' }}
+                disabled={!redeemPoints || redeemPoints > data.balance}
+              >
+                {dict.loyalty.redeemPoints}
+              </button>
+            </div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 10 }}>
+              1 {dict.reward.coins} = 1000 {locale === 'ar' ? 'ل.س' : 'SYP'}
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="card">
-        <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 16 }}>{dict.loyalty.history}</h3>
-        {data.transactions.length === 0 ? (
-          <p style={{ color: 'var(--br-muted)' }}>{dict.loyalty.noHistory}</p>
-        ) : (
-          <table className="table">
-            <thead>
-              <tr>
-                <th>{locale === 'ar' ? 'التاريخ' : 'Date'}</th>
-                <th>{locale === 'ar' ? 'النوع' : 'Type'}</th>
-                <th>{locale === 'ar' ? 'النقاط' : 'Points'}</th>
-                <th>{locale === 'ar' ? 'السبب' : 'Reason'}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.transactions.map((t: any) => (
-                <tr key={t.id}>
-                  <td style={{ fontSize: 13 }}>{new Date(t.createdAt).toLocaleDateString()}</td>
-                  <td>
-                    <span className={`badge ${t.type === 'EARN' || t.type === 'STAMP' ? 'badge-success' : 'badge-muted'}`}>
-                      {getTypeLabel(t.type)}
-                    </span>
-                  </td>
-                  <td style={{ fontWeight: 600, color: t.points > 0 ? 'var(--br-gold)' : 'var(--br-coffee)' }}>
-                    {t.points > 0 ? `+${t.points}` : t.points}
-                  </td>
-                  <td style={{ fontSize: 13, color: 'var(--br-muted)' }}>{t.reason || '-'}</td>
+        {/* QR Card */}
+        <div className="card" style={{ ...sectionCard, marginBottom: 28 }}>
+          <h2 style={{ fontSize: 20, fontWeight: 900, marginBottom: 16 }}>
+            <span style={{ marginInlineEnd: 8 }}>📱</span>
+            {dict.loyalty.qrCard}
+          </h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
+            <div style={{
+              width: 180, minHeight: 180,
+              background: 'var(--br-white)',
+              border: '2px solid var(--br-gold)',
+              borderRadius: 12,
+              display: 'grid', placeItems: 'center',
+              padding: 16, textAlign: 'center',
+              fontSize: 14, fontFamily: 'monospace',
+              color: 'var(--br-coffee)', wordBreak: 'break-word',
+            }}>
+              {qr?.publicToken || '---'}
+            </div>
+            <div style={{ maxWidth: 460 }}>
+              <p style={{ color: 'var(--br-muted)', marginBottom: 14 }}>{dict.loyalty.qrHint}</p>
+              <button onClick={handleRegenerateQR} className="btn btn-outline">{dict.loyalty.regenerate}</button>
+            </div>
+          </div>
+        </div>
+
+        {/* Transaction History */}
+        <div className="card" style={{ ...sectionCard, overflowX: 'auto' }}>
+          <h2 style={{ fontSize: 20, fontWeight: 900, marginBottom: 16 }}>
+            <span style={{ marginInlineEnd: 8 }}>📋</span>
+            {dict.loyalty.history}
+          </h2>
+          {data.transactions.length === 0 ? (
+            <p style={{ color: 'var(--br-muted)' }}>{dict.loyalty.noHistory}</p>
+          ) : (
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>{locale === 'ar' ? 'التاريخ' : 'Date'}</th>
+                  <th>{locale === 'ar' ? 'النوع' : 'Type'}</th>
+                  <th>{locale === 'ar' ? 'النقاط' : 'Points'}</th>
+                  <th>{locale === 'ar' ? 'السبب' : 'Reason'}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+              </thead>
+              <tbody>
+                {data.transactions.map(transaction => (
+                  <tr key={transaction.id}>
+                    <td style={{ fontSize: 13 }}>{formatDate(transaction.createdAt, locale)}</td>
+                    <td>
+                      <span className={`badge ${transaction.points > 0 ? 'badge-success' : 'badge-muted'}`}>
+                        {getTypeLabel(transaction.type)}
+                      </span>
+                    </td>
+                    <td style={{
+                      fontWeight: 900,
+                      color: transaction.points > 0 ? 'var(--br-gold-dark)' : 'var(--br-coffee)',
+                    }}>
+                      {transaction.points > 0 ? `+${transaction.points}` : transaction.points}
+                    </td>
+                    <td style={{ fontSize: 13, color: 'var(--br-muted)' }}>{transaction.reason || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+    </div>
+
+    {/* Celebration confetti */}
+    {celebrate && (
+      <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 100, overflow: 'hidden' }}>
+        {Array.from({ length: 24 }, (_, i) => (
+          <div
+            key={i}
+            className="stamp-confetti"
+            style={{
+              left: `${10 + Math.random() * 80}%`,
+              top: `${40 + Math.random() * 30}%`,
+              background: ['var(--br-gold)', 'var(--br-gold-light)', 'var(--br-coffee)', 'var(--br-espresso)'][i % 4],
+              animationDelay: `${i * 0.08}s`,
+              width: `${6 + Math.random() * 8}px`,
+              height: `${6 + Math.random() * 8}px`,
+            }}
+          />
+        ))}
       </div>
+    )}
+  </div>
+
     </div>
   );
 }

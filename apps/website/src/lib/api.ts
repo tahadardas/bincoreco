@@ -4,6 +4,27 @@ interface FetchOptions extends RequestInit {
   token?: string | null;
 }
 
+export class ApiError extends Error {
+  status: number;
+  errors: unknown;
+
+  constructor(message: string, status: number, errors?: unknown) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.errors = errors;
+  }
+}
+
+function clearStoredAuth() {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  localStorage.removeItem('token');
+  localStorage.removeItem('refreshToken');
+  window.dispatchEvent(new Event('banco-auth-unauthorized'));
+}
+
 async function apiFetch<T>(endpoint: string, options: FetchOptions & { token?: string | null } = {}): Promise<T> {
   const { token, ...fetchOptions } = options;
   const headers: Record<string, string> = {
@@ -15,14 +36,32 @@ async function apiFetch<T>(endpoint: string, options: FetchOptions & { token?: s
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${API_URL}${endpoint}`, {
-    ...fetchOptions,
-    headers,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${endpoint}`, {
+      ...fetchOptions,
+      headers,
+    });
+  } catch {
+    throw new ApiError('Network error. Please try again.', 0);
+  }
 
-  const data = await res.json();
-  if (!data.success) {
-    throw new Error(data.message || 'API Error');
+  const text = await res.text();
+  let data: any = null;
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      throw new ApiError('Unexpected server response.', res.status);
+    }
+  }
+
+  if (res.status === 401) {
+    clearStoredAuth();
+  }
+
+  if (!res.ok || !data?.success) {
+    throw new ApiError(data?.message || 'API Error', res.status, data?.errors);
   }
   return data.data;
 }

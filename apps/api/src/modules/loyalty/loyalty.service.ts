@@ -1,25 +1,54 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { v4 as uuid } from 'uuid';
-import * as crypto from 'crypto';
+import { AuditActions, AuditLogContext } from '../audit-logs/audit-log.types';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 @Injectable()
 export class LoyaltyService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private auditLogs: AuditLogsService,
+  ) {}
 
   private async getOrCreateAccount(customerId: string) {
-    let account = await this.prisma.loyaltyAccount.findUnique({ where: { customerId } });
-    if (!account) {
-      account = await this.prisma.loyaltyAccount.create({
-        data: { customerId },
-      });
+    return this.prisma.loyaltyAccount.upsert({
+      where: { customerId },
+      update: {},
+      create: { customerId },
+    });
+  }
+
+  async getOrCreateCustomerProfile(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
     }
-    return account;
+    if (user.role !== 'customer') {
+      throw new BadRequestException('Loyalty is available for customer accounts only');
+    }
+
+    const profile = await this.prisma.customerProfile.upsert({
+      where: { userId },
+      update: {},
+      create: { userId },
+    });
+
+    await this.getOrCreateAccount(profile.id);
+    await this.prisma.qRCard.upsert({
+      where: { customerId: profile.id },
+      update: {},
+      create: {
+        customerId: profile.id,
+        publicToken: this.generateQrPublicToken(),
+      },
+    });
+
+    return profile;
   }
 
   async getMyAccount(userId: string) {
-    const profile = await this.prisma.customerProfile.findUnique({ where: { userId } });
-    if (!profile) throw new NotFoundException('Customer profile not found');
+    const profile = await this.getOrCreateCustomerProfile(userId);
     const account = await this.getOrCreateAccount(profile.id);
     const transactions = await this.prisma.loyaltyTransaction.findMany({
       where: { loyaltyAccountId: account.id },
@@ -35,8 +64,7 @@ export class LoyaltyService {
   }
 
   async getTransactions(userId: string, page = 1, limit = 20) {
-    const profile = await this.prisma.customerProfile.findUnique({ where: { userId } });
-    if (!profile) throw new NotFoundException('Customer profile not found');
+    const profile = await this.getOrCreateCustomerProfile(userId);
     const account = await this.getOrCreateAccount(profile.id);
     const skip = (page - 1) * limit;
     const [items, total] = await Promise.all([
@@ -52,8 +80,7 @@ export class LoyaltyService {
   }
 
   async awardPoints(userId: string, points: number, reason: string, orderId?: string) {
-    const profile = await this.prisma.customerProfile.findUnique({ where: { userId } });
-    if (!profile) return null;
+    const profile = await this.getOrCreateCustomerProfile(userId);
     const account = await this.getOrCreateAccount(profile.id);
     await this.prisma.loyaltyAccount.update({
       where: { id: account.id },
@@ -74,8 +101,7 @@ export class LoyaltyService {
   }
 
   async awardStamp(userId: string, orderId: string) {
-    const profile = await this.prisma.customerProfile.findUnique({ where: { userId } });
-    if (!profile) return null;
+    const profile = await this.getOrCreateCustomerProfile(userId);
     const account = await this.getOrCreateAccount(profile.id);
     await this.prisma.loyaltyAccount.update({
       where: { id: account.id },
@@ -96,8 +122,7 @@ export class LoyaltyService {
   }
 
   async redeemStampReward(userId: string) {
-    const profile = await this.prisma.customerProfile.findUnique({ where: { userId } });
-    if (!profile) throw new NotFoundException('Customer profile not found');
+    const profile = await this.getOrCreateCustomerProfile(userId);
     const account = await this.getOrCreateAccount(profile.id);
     const stampTarget = await this.prisma.setting.findUnique({ where: { key: 'stamp_target' } });
     const target = stampTarget ? parseInt(stampTarget.value) : 10;
@@ -119,8 +144,7 @@ export class LoyaltyService {
   }
 
   async redeemPoints(userId: string, points: number) {
-    const profile = await this.prisma.customerProfile.findUnique({ where: { userId } });
-    if (!profile) throw new NotFoundException('Customer profile not found');
+    const profile = await this.getOrCreateCustomerProfile(userId);
     const account = await this.getOrCreateAccount(profile.id);
     if (account.balance < points) {
       throw new BadRequestException(`Not enough points. You have ${account.balance}.`);
@@ -143,14 +167,13 @@ export class LoyaltyService {
   }
 
   async getQR(userId: string) {
-    const profile = await this.prisma.customerProfile.findUnique({ where: { userId } });
-    if (!profile) throw new NotFoundException('Customer profile not found');
+    const profile = await this.getOrCreateCustomerProfile(userId);
     let qrCard = await this.prisma.qRCard.findUnique({ where: { customerId: profile.id } });
     if (!qrCard) {
       qrCard = await this.prisma.qRCard.create({
         data: {
           customerId: profile.id,
-          publicToken: uuid().replace(/-/g, '').substring(0, 16),
+          publicToken: this.generateQrPublicToken(),
         },
       });
     }
@@ -158,9 +181,8 @@ export class LoyaltyService {
   }
 
   async regenerateQR(userId: string) {
-    const profile = await this.prisma.customerProfile.findUnique({ where: { userId } });
-    if (!profile) throw new NotFoundException('Customer profile not found');
-    const token = uuid().replace(/-/g, '').substring(0, 16);
+    const profile = await this.getOrCreateCustomerProfile(userId);
+    const token = this.generateQrPublicToken();
     return this.prisma.qRCard.upsert({
       where: { customerId: profile.id },
       update: { publicToken: token, regeneratedAt: new Date() },
@@ -185,6 +207,10 @@ export class LoyaltyService {
           customer: {
             include: { user: { select: { id: true, email: true, fullName: true } } },
           },
+          transactions: {
+            orderBy: { createdAt: 'desc' },
+            take: 5,
+          },
         },
         orderBy: { updatedAt: 'desc' },
         skip,
@@ -195,17 +221,18 @@ export class LoyaltyService {
     return { items, total, page, limit };
   }
 
-  async adminAdjustPoints(accountId: string, points: number, reason: string, adminUserId: string) {
+  async adminAdjustPoints(accountId: string, points: number, reason: string, adminUserId: string, auditContext?: AuditLogContext) {
     const account = await this.prisma.loyaltyAccount.findUnique({ where: { id: accountId } });
     if (!account) throw new NotFoundException('Loyalty account not found');
-    await this.prisma.loyaltyAccount.update({
+    const updatedAccount = await this.prisma.loyaltyAccount.update({
       where: { id: accountId },
       data: {
         balance: { increment: points },
         ...(points > 0 ? { lifetimeEarned: { increment: points } } : { lifetimeRedeemed: { increment: Math.abs(points) } }),
       },
     });
-    return this.prisma.loyaltyTransaction.create({
+
+    const transaction = await this.prisma.loyaltyTransaction.create({
       data: {
         loyaltyAccountId: accountId,
         type: points > 0 ? 'ADMIN_ADJUST' : 'ADMIN_ADJUST',
@@ -214,19 +241,35 @@ export class LoyaltyService {
         createdBy: adminUserId,
       },
     });
+
+    await this.auditLogs.record({
+      ...auditContext,
+      actorUserId: adminUserId,
+      action: AuditActions.LOYALTY_POINTS_ADJUSTED,
+      entityType: 'LoyaltyAccount',
+      entityId: accountId,
+      beforeSnapshot: account,
+      afterSnapshot: {
+        account: updatedAccount,
+        transaction,
+      },
+    });
+
+    return transaction;
   }
 
-  async adminAdjustStamps(accountId: string, stamps: number, reason: string, adminUserId: string) {
+  async adminAdjustStamps(accountId: string, stamps: number, reason: string, adminUserId: string, auditContext?: AuditLogContext) {
     const account = await this.prisma.loyaltyAccount.findUnique({ where: { id: accountId } });
     if (!account) throw new NotFoundException('Loyalty account not found');
-    await this.prisma.loyaltyAccount.update({
+    const updatedAccount = await this.prisma.loyaltyAccount.update({
       where: { id: accountId },
       data: {
         stampCount: { increment: stamps },
         ...(stamps > 0 ? { stampTotalEarned: { increment: stamps } } : {}),
       },
     });
-    return this.prisma.loyaltyTransaction.create({
+
+    const transaction = await this.prisma.loyaltyTransaction.create({
       data: {
         loyaltyAccountId: accountId,
         type: stamps > 0 ? 'ADMIN_STAMP' : 'ADMIN_STAMP',
@@ -235,5 +278,24 @@ export class LoyaltyService {
         createdBy: adminUserId,
       },
     });
+
+    await this.auditLogs.record({
+      ...auditContext,
+      actorUserId: adminUserId,
+      action: AuditActions.LOYALTY_POINTS_ADJUSTED,
+      entityType: 'LoyaltyAccount',
+      entityId: accountId,
+      beforeSnapshot: account,
+      afterSnapshot: {
+        account: updatedAccount,
+        transaction,
+      },
+    });
+
+    return transaction;
+  }
+
+  private generateQrPublicToken() {
+    return uuid().replace(/-/g, '').substring(0, 20);
   }
 }
