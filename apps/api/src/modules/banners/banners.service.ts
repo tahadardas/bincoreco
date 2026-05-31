@@ -33,6 +33,7 @@ export class BannersService {
 
   async create(data: {
     imageUrl: string;
+    mobileImageUrl?: string;
     linkUrl?: string;
     sortOrder?: number;
     isActive?: boolean;
@@ -41,6 +42,7 @@ export class BannersService {
     return this.prisma.banner.create({
       data: {
         imageUrl: data.imageUrl,
+        mobileImageUrl: data.mobileImageUrl,
         linkUrl: data.linkUrl,
         sortOrder: data.sortOrder ?? 0,
         isActive: data.isActive ?? true,
@@ -54,6 +56,7 @@ export class BannersService {
 
   async update(id: string, data: {
     imageUrl?: string;
+    mobileImageUrl?: string;
     linkUrl?: string;
     sortOrder?: number;
     isActive?: boolean;
@@ -73,6 +76,7 @@ export class BannersService {
       where: { id },
       data: {
         imageUrl: data.imageUrl,
+        mobileImageUrl: data.mobileImageUrl,
         linkUrl: data.linkUrl,
         sortOrder: data.sortOrder,
         isActive: data.isActive,

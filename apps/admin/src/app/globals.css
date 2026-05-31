@@ -21,6 +21,20 @@ body {
   min-height: 100vh;
 }
 
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image: url('/brand/banco-arabesque-pattern.svg');
+  background-size: 400px 400px;
+  opacity: 0.025;
+  color: rgba(201, 150, 26, 0.6);
+}
+
+body > * { position: relative; z-index: 1; }
+
 a { color: inherit; text-decoration: none; }
 button { cursor: pointer; border: none; font-family: inherit; }
 

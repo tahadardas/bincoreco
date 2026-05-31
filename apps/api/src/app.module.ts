@@ -15,6 +15,7 @@ import { AdminModule } from './modules/admin/admin.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { HealthModule } from './modules/health/health.module';
 import { BannersModule } from './modules/banners/banners.module';
+import { MediaModule } from './modules/media/media.module';
 import { LoyaltyModule } from './modules/loyalty/loyalty.module';
 
 @Module({
@@ -34,6 +35,7 @@ import { LoyaltyModule } from './modules/loyalty/loyalty.module';
     AdminModule,
     SettingsModule,
     BannersModule,
+    MediaModule,
     LoyaltyModule,
   ],
   providers: [

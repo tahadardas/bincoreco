@@ -112,6 +112,7 @@ model Product {
   deletedAt                  DateTime?
 
   translations ProductTranslation[]
+  images       ProductImage[]
   variants     ProductVariant[]
   coffeeProfile CoffeeProfile?
   grindOptions ProductGrindOption[]
@@ -120,6 +121,22 @@ model Product {
   orderItems   OrderItem[]
 
   @@map("products")
+}
+
+model ProductImage {
+  id        String   @id @default(uuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  altAr     String?
+  altEn     String?
+  sortOrder Int      @default(0)
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([productId])
+  @@map("product_images")
 }
 
 model ProductTranslation {
@@ -389,13 +406,14 @@ model Currency {
 }
 
 model Banner {
-  id        String   @id @default(uuid())
-  imageUrl  String
-  linkUrl   String?
-  sortOrder Int      @default(0)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String   @id @default(uuid())
+  imageUrl        String
+  mobileImageUrl  String?
+  linkUrl         String?
+  sortOrder       Int      @default(0)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   translations BannerTranslation[]
 

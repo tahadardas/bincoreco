@@ -54,7 +54,7 @@ export default function ProductCard({ product, locale, labels }: ProductCardProp
         {product.imageUrl ? (
           <img src={product.imageUrl} alt={name} />
         ) : (
-          <div className="product-card__fallback" aria-hidden="true">{fallbackLetters(product, locale)}</div>
+          <div className="product-card__fallback"><div className="product-card__fallback-icon">{fallbackLetters(product, locale)}</div></div>
         )}
       </div>
       <div className="product-card__body">

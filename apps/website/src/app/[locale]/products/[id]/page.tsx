@@ -18,6 +18,7 @@ interface Product {
   isBestSeller: boolean;
   isMaestroPick: boolean;
   imageUrl: string | null;
+  images?: { id: string; url: string; altAr?: string; altEn?: string; isPrimary: boolean; sortOrder: number }[];
   basePreparationTimeMinutes: number;
   translations: {
     locale: string;
@@ -178,18 +179,42 @@ export default function ProductDetailPage() {
     <div className="page-shell">
       <div className="container">
         <div className="detail-grid">
-          <div className="card" style={{ overflow: 'hidden' }}>
-            <div style={{
-              minHeight: 420,
-              display: 'grid',
-              placeItems: 'center',
-              background:
-                'linear-gradient(135deg, rgba(27,16,11,0.94), rgba(75,46,30,0.84)), repeating-linear-gradient(45deg, rgba(201,150,26,0.13) 0 1px, transparent 1px 16px)',
-            }}>
-              {product.imageUrl ? (
-                <img src={product.imageUrl} alt={translation.name} style={{ width: '100%', height: 420, objectFit: 'cover' }} />
+          <div>
+            <div className="card" style={{ overflow: 'hidden' }}>
+              {product.images && product.images.length > 0 ? (
+                <div>
+                  <div style={{ minHeight: 420, display: 'grid', placeItems: 'center', background: '#1b100b' }}>
+                    <img
+                      src={product.images.find(i => i.isPrimary)?.url || product.images[0].url}
+                      alt={translation.name}
+                      style={{ width: '100%', height: 420, objectFit: 'cover' }}
+                    />
+                  </div>
+                  {product.images.length > 1 && (
+                    <div style={{ display: 'flex', gap: 8, padding: 12, overflowX: 'auto' }}>
+                      {product.images.map(img => (
+                        <button
+                          key={img.id}
+                          style={{
+                            width: 72, height: 72, borderRadius: 8, overflow: 'hidden', flexShrink: 0,
+                            border: img.isPrimary ? '3px solid var(--br-gold)' : '2px solid transparent',
+                            padding: 0, cursor: 'pointer', background: 'none',
+                          }}
+                        >
+                          <img src={img.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : product.imageUrl ? (
+                <div style={{ minHeight: 420, display: 'grid', placeItems: 'center', background: 'linear-gradient(135deg, rgba(27,16,11,0.94), rgba(75,46,30,0.84)), repeating-linear-gradient(45deg, rgba(201,150,26,0.13) 0 1px, transparent 1px 16px)' }}>
+                  <img src={product.imageUrl} alt={translation.name} style={{ width: '100%', height: 420, objectFit: 'cover' }} />
+                </div>
               ) : (
-                <img src="/brand/br-monogram.png" alt="" style={{ width: '42%', maxHeight: 310, objectFit: 'contain', opacity: 0.9 }} />
+                <div className="premium-fallback" style={{ minHeight: 420 }}>
+                  {locale === 'ar' ? 'Banco Ricco' : 'Banco Ricco'}
+                </div>
               )}
             </div>
           </div>
@@ -291,12 +316,15 @@ export default function ProductDetailPage() {
                         style={{ minHeight: 100 }}
                       >
                         <div style={{ fontSize: 28, marginBottom: 6 }}>
-                          {option.code === 'espresso' ? '☕' :
-                           option.code === 'turkish' ? '🏺' :
-                           option.code === 'french_press' ? '🫖' :
-                           option.code === 'pour_over' ? '⏳' :
-                           option.code === 'aeropress' ? '💨' :
-                           option.code === 'moka_pot' ? '🍵' : '⚙️'}
+                          {option.code === 'ESPRESSO' ? '☕' :
+                           option.code === 'TURKISH' || option.code === 'TURKISH_SHAMI' ? '🏺' :
+                           option.code === 'FRENCH_PRESS' ? '🫖' :
+                           option.code === 'POUR_OVER' || option.code === 'V60' ? '⏳' :
+                           option.code === 'AEROPRESS' ? '💨' :
+                           option.code === 'MOKA_POT' ? '🍵' :
+                           option.code === 'AMERICAN_COFFEE' ? '🇺🇸' :
+                           option.code === 'COLD_BREW' ? '🧊' :
+                           option.code === 'WHOLE_BEAN' ? '🫘' : '⚙️'}
                         </div>
                         <strong>{locale === 'ar' ? option.nameAr : option.nameEn}</strong>
                         <span style={{ fontSize: 12 }}>
@@ -340,7 +368,7 @@ export default function ProductDetailPage() {
               loading={adding}
               size="large"
             >
-              {added ? (locale === 'ar' ? 'تمت الإضافة' : 'Added') : user ? dict.product.addToCart : dict.product.loginToAdd}
+              {added ? (locale === 'ar' ? 'تمت الإضافة ✓' : 'Added ✓') : user ? dict.product.addToCart : (locale === 'ar' ? 'أضف للسلة' : 'Add to Cart')}
             </EspressoButton>
           </div>
         </div>

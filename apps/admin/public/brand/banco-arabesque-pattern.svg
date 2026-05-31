@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+  <defs>
+    <!-- Arabesque floral vine motif -->
+    <g id="arabesque-vine">
+      <path d="M0,100 Q25,80 50,100 Q75,120 100,100 Q125,80 150,100" fill="none" stroke="currentColor" stroke-width="0.5"/>
+      <path d="M25,85 Q30,60 50,55 Q70,50 75,70" fill="none" stroke="currentColor" stroke-width="0.4"/>
+      <path d="M75,115 Q80,135 100,140 Q120,145 125,125" fill="none" stroke="currentColor" stroke-width="0.4"/>
+      <circle cx="50" cy="55" r="3" fill="none" stroke="currentColor" stroke-width="0.3"/>
+      <circle cx="100" cy="140" r="3" fill="none" stroke="currentColor" stroke-width="0.3"/>
+    </g>
+    <!-- 8-pointed Damascus star -->
+    <g id="damascus-star">
+      <polygon points="50,15 57,35 77,38 60,52 64,72 50,58 36,72 40,52 23,38 43,35" fill="none" stroke="currentColor" stroke-width="0.5"/>
+      <polygon points="50,22 55,36 69,38 57,48 60,62 50,53 40,62 43,48 31,38 45,36" fill="none" stroke="currentColor" stroke-width="0.25"/>
+      <circle cx="50" cy="45" r="4" fill="none" stroke="currentColor" stroke-width="0.3"/>
+    </g>
+    <!-- Ornamental arc -->
+    <g id="ornamental-arc">
+      <path d="M0,50 Q50,0 100,50" fill="none" stroke="currentColor" stroke-width="0.35"/>
+      <path d="M5,50 Q50,10 95,50" fill="none" stroke="currentColor" stroke-width="0.2"/>
+    </g>
+    <!-- Small diamond motif -->
+    <g id="diamond">
+      <polygon points="25,0 50,25 25,50 0,25" fill="none" stroke="currentColor" stroke-width="0.3"/>
+      <circle cx="25" cy="25" r="1.5" fill="currentColor" opacity="0.5"/>
+    </g>
+  </defs>
+
+  <!-- Background is transparent -->
+
+  <!-- Row 1: Arabesque + Star alternating -->
+  <use href="#arabesque-vine" x="20" y="10" opacity="0.6"/>
+  <use href="#damascus-star" x="320" y="5" opacity="0.5"/>
+  <use href="#ornamental-arc" x="150" y="35" opacity="0.4"/>
+
+  <!-- Row 2: Diamonds -->
+  <use href="#diamond" x="60" y="120" opacity="0.5"/>
+  <use href="#diamond" x="160" y="110" opacity="0.5"/>
+  <use href="#diamond" x="260" y="120" opacity="0.5"/>
+  <use href="#diamond" x="360" y="110" opacity="0.5"/>
+
+  <!-- Row 3: Arc + Star -->
+  <use href="#ornamental-arc" x="10" y="140" opacity="0.4"/>
+  <use href="#damascus-star" x="140" y="150" opacity="0.5"/>
+  <use href="#arabesque-vine" x="260" y="155" opacity="0.6"/>
+
+  <!-- Row 4: Pattern -->
+  <use href="#arabesque-vine" x="80" y="240" opacity="0.5"/>
+  <use href="#ornamental-arc" x="240" y="230" opacity="0.35"/>
+
+  <!-- Row 5: Star + Vine -->
+  <use href="#damascus-star" x="20" y="290" opacity="0.5"/>
+  <use href="#arabesque-vine" x="180" y="295" opacity="0.6"/>
+  <use href="#damascus-star" x="340" y="285" opacity="0.5"/>
+
+  <!-- Row 6: Arc + Diamonds -->
+  <use href="#ornamental-arc" x="130" y="330" opacity="0.35"/>
+  <use href="#diamond" x="50" y="350" opacity="0.4"/>
+  <use href="#diamond" x="250" y="355" opacity="0.4"/>
+  <use href="#diamond" x="350" y="345" opacity="0.4"/>
+
+  <!-- Corner ornamental accents -->
+  <use href="#ornamental-arc" x="280" y="10" opacity="0.3" transform="rotate(90 330 60)"/>
+  <use href="#ornamental-arc" x="-20" y="10" opacity="0.3" transform="rotate(-90 30 60)"/>
+</svg>

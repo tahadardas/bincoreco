@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { adminFetch } from '@/lib/api';
+import { adminFetch, adminUpload } from '@/lib/api';
 
 type ProductType = 'HOT_DRINK' | 'COLD_DRINK' | 'COFFEE_BEAN' | 'GROUND_COFFEE' | 'PACKAGE';
 
@@ -50,6 +50,7 @@ interface ProductForm {
   isMaestroPick: boolean;
   isFeatured: boolean;
   imageUrl: string;
+  images: { id?: string; url: string; altAr?: string; altEn?: string; isPrimary?: boolean; sortOrder?: number }[];
   basePreparationTimeMinutes: number;
   sortOrder: number;
   translations: TranslationForm[];
@@ -76,6 +77,7 @@ const emptyForm: ProductForm = {
   isMaestroPick: false,
   isFeatured: false,
   imageUrl: '',
+  images: [],
   basePreparationTimeMinutes: 15,
   sortOrder: 0,
   translations: [
@@ -120,6 +122,7 @@ export default function ProductEditPage() {
   const isNew = params.id === 'new';
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [form, setForm] = useState<ProductForm>(emptyForm);
   const [categories, setCategories] = useState<Category[]>([]);
   const [grindOptions, setGrindOptions] = useState<GrindOption[]>([]);
@@ -160,6 +163,14 @@ export default function ProductEditPage() {
           isMaestroPick: product.isMaestroPick,
           isFeatured: product.isFeatured,
           imageUrl: product.imageUrl || '',
+          images: (product.images || []).map((img: any) => ({
+            id: img.id,
+            url: img.url,
+            altAr: img.altAr || '',
+            altEn: img.altEn || '',
+            isPrimary: img.isPrimary,
+            sortOrder: img.sortOrder,
+          })),
           basePreparationTimeMinutes: product.basePreparationTimeMinutes,
           sortOrder: product.sortOrder,
           translations: normalizeTranslations(product.translations),
@@ -210,6 +221,42 @@ export default function ProductEditPage() {
       ? form.grindOptionIds.filter(optionId => optionId !== id)
       : [...form.grindOptionIds, id];
     setForm({ ...form, grindOptionIds });
+  };
+
+  const handleUploadImage = async (file: File) => {
+    setUploading(true);
+    try {
+      const result = await adminUpload(file, 'products');
+      setForm(prev => ({
+        ...prev,
+        images: [...prev.images, { url: result.url, isPrimary: prev.images.length === 0, sortOrder: prev.images.length }],
+        imageUrl: prev.images.length === 0 ? result.url : prev.imageUrl,
+      }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'فشل رفع الصورة');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const setPrimaryImage = (index: number) => {
+    const images = form.images.map((img, i) => ({
+      ...img,
+      isPrimary: i === index,
+    }));
+    setForm({ ...form, images, imageUrl: form.images[index].url });
+  };
+
+  const removeImage = (index: number) => {
+    const images = form.images.filter((_, i) => i !== index);
+    if (form.images[index].isPrimary && images.length > 0) {
+      images[0].isPrimary = true;
+    }
+    setForm({
+      ...form,
+      images,
+      imageUrl: images.find(img => img.isPrimary)?.url || (images[0]?.url || ''),
+    });
   };
 
   const save = async () => {
@@ -267,11 +314,12 @@ export default function ProductEditPage() {
         </button>
       </div>
 
-      {error && <div className="card" style={{ color: 'var(--br-danger)', marginBottom: 16 }}>{error}</div>}
+      {error && <div className="card" style={{ color: 'var(--br-danger)', marginBottom: 16, padding: 12 }}>{error}</div>}
 
-      <div style={{ display: 'grid', gap: 20 }}>
-        <section className="card">
-          <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>البيانات الأساسية</h2>
+      <div style={{ display: 'grid', gap: 20, marginBottom: 80 }}>
+        {/* Section 1: Basic Info */}
+        <section className="card" style={{ padding: 20 }}>
+          <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, color: 'var(--br-gold-dark)' }}>معلومات المنتج</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(180px, 1fr))', gap: 16 }}>
             <label style={{ fontWeight: 600, fontSize: 14 }}>
               SKU
@@ -279,12 +327,7 @@ export default function ProductEditPage() {
             </label>
             <label style={{ fontWeight: 600, fontSize: 14 }}>
               النوع
-              <select
-                className="input"
-                style={{ marginTop: 6 }}
-                value={form.type}
-                onChange={event => setForm({ ...form, type: event.target.value as ProductType, grindOptionIds: event.target.value === 'COFFEE_BEAN' ? form.grindOptionIds : [] })}
-              >
+              <select className="input" style={{ marginTop: 6 }} value={form.type} onChange={event => setForm({ ...form, type: event.target.value as ProductType, grindOptionIds: event.target.value === 'COFFEE_BEAN' ? form.grindOptionIds : [] })}>
                 {productTypes.map(productType => (
                   <option key={productType} value={productType}>{productTypeLabels[productType]}</option>
                 ))}
@@ -300,11 +343,7 @@ export default function ProductEditPage() {
               </select>
             </label>
             <label style={{ fontWeight: 600, fontSize: 14 }}>
-              رابط الصورة
-              <input className="input" style={{ marginTop: 6 }} value={form.imageUrl} onChange={event => setForm({ ...form, imageUrl: event.target.value })} />
-            </label>
-            <label style={{ fontWeight: 600, fontSize: 14 }}>
-              وقت التجهيز بالدقائق
+              وقت التجهيز (دقائق)
               <input className="input" style={{ marginTop: 6 }} type="number" value={form.basePreparationTimeMinutes} onChange={event => setForm({ ...form, basePreparationTimeMinutes: Number(event.target.value) || 15 })} />
             </label>
             <label style={{ fontWeight: 600, fontSize: 14 }}>
@@ -321,19 +360,43 @@ export default function ProductEditPage() {
               ['isFeatured', 'مميز'],
             ].map(([key, label]) => (
               <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 600 }}>
-                <input
-                  type="checkbox"
-                  checked={Boolean(form[key as keyof ProductForm])}
-                  onChange={event => setForm({ ...form, [key]: event.target.checked })}
-                />
+                <input type="checkbox" checked={Boolean(form[key as keyof ProductForm])} onChange={event => setForm({ ...form, [key]: event.target.checked })} />
                 {label}
               </label>
             ))}
           </div>
         </section>
 
-        <section className="card">
-          <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>الترجمات والقصة</h2>
+        {/* Section 2: Product Images */}
+        <section className="card" style={{ padding: 20 }}>
+          <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 6, color: 'var(--br-gold-dark)' }}>صور المنتج</h2>
+          <p style={{ color: 'var(--br-muted)', fontSize: 13, marginBottom: 16 }}>يفضل صورة مربعة أو بنسبة 4:3 وبخلفية نظيفة. الصورة الأولى تصبح الرئيسية.</p>
+          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 14, alignItems: 'flex-start' }}>
+            {form.images.map((img, index) => (
+              <div key={index} style={{ position: 'relative', width: 120, borderRadius: 8, overflow: 'hidden', border: img.isPrimary ? '3px solid var(--br-gold)' : '1px solid var(--br-line)' }}>
+                <img src={img.url} alt="" style={{ width: 120, height: 120, objectFit: 'cover', display: 'block' }} />
+                {img.isPrimary && <span style={{ position: 'absolute', top: 4, right: 4, background: 'var(--br-gold)', color: '#fff', fontSize: 10, fontWeight: 800, padding: '2px 6px', borderRadius: 4 }}>أساسية</span>}
+                <div style={{ display: 'flex', gap: 4, padding: 4 }}>
+                  {!img.isPrimary && <button className="btn btn-sm" style={{ flex: 1, fontSize: 11, padding: '3px 0', background: 'var(--br-cream)' }} onClick={() => setPrimaryImage(index)}>رئيسية</button>}
+                  <button className="btn btn-sm" style={{ flex: 1, fontSize: 11, padding: '3px 0', background: '#fee' }} onClick={() => removeImage(index)}>حذف</button>
+                </div>
+              </div>
+            ))}
+            <label className="btn btn-primary" style={{ width: 120, height: 120, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', borderRadius: 8, gap: 6, fontSize: 13 }}>
+              {uploading ? 'جاري الرفع...' : (
+                <>
+                  <span style={{ fontSize: 24, lineHeight: 1 }}>+</span>
+                  <span>تحميل صورة</span>
+                </>
+              )}
+              <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={async event => { const file = event.target.files?.[0]; if (file) await handleUploadImage(file); event.target.value = ''; }} />
+            </label>
+          </div>
+        </section>
+
+        {/* Section 3: Translations */}
+        <section className="card" style={{ padding: 20 }}>
+          <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, color: 'var(--br-gold-dark)' }}>الترجمات والقصة</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(260px, 1fr))', gap: 16 }}>
             {form.translations.map((translation, index) => (
               <div key={translation.locale} style={{ background: 'var(--br-cream)', borderRadius: 8, padding: 16 }}>
@@ -414,8 +477,8 @@ export default function ProductEditPage() {
         </section>
 
         {form.type === 'COFFEE_BEAN' && (
-          <section className="card">
-            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>خيارات الطحن المتاحة</h2>
+          <section className="card" style={{ padding: 20 }}>
+            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8, color: 'var(--br-gold-dark)' }}>خيارات الطحن المتاحة</h2>
             <p style={{ color: 'var(--br-muted)', fontSize: 13, marginBottom: 16 }}>
               خيار Whole Bean يختاره العميل من نوع البن، أما الطرق التالية فهي للبن المطحون فقط.
             </p>
@@ -442,15 +505,26 @@ export default function ProductEditPage() {
             </div>
           </section>
         )}
+      </div>
 
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-start' }}>
-          <button onClick={save} disabled={saving} className="btn btn-primary">
-            {saving ? 'جاري الحفظ...' : isNew ? 'إضافة المنتج' : 'حفظ التغييرات'}
+      {/* Sticky Save Bar */}
+      <div style={{
+        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100,
+        background: 'rgba(255, 250, 240, 0.96)', borderTop: '1px solid var(--br-line)',
+        padding: '12px 24px', display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'flex-end',
+        backdropFilter: 'blur(8px)',
+      }}>
+        <button onClick={save} disabled={saving} className="btn btn-primary" style={{ minWidth: 120 }}>
+          {saving ? 'جاري الحفظ...' : isNew ? 'إضافة المنتج' : 'حفظ التغييرات'}
+        </button>
+        <button onClick={() => router.push('/dashboard/products')} className="btn" style={{ background: 'var(--br-cream)' }}>
+          إلغاء
+        </button>
+        {!isNew && (
+          <button onClick={() => window.open(`http://localhost:3000/ar/products/${params.id}`, '_blank')} className="btn btn-outline" style={{ marginInlineEnd: 'auto' }}>
+            معاينة
           </button>
-          <button onClick={() => router.push('/dashboard/products')} className="btn" style={{ background: 'var(--br-cream)' }}>
-            إلغاء
-          </button>
-        </div>
+        )}
       </div>
     </div>
   );

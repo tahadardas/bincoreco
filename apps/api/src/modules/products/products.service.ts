@@ -44,6 +44,7 @@ export class ProductsService {
 
     const include: Prisma.ProductInclude = {
       translations: params.locale ? { where: { locale: params.locale } } : true,
+      images: { orderBy: { sortOrder: 'asc' }, take: 1 },
       variants: {
         where: { isActive: true },
         include: { prices: { where: { isActive: true } } },
@@ -74,6 +75,7 @@ export class ProductsService {
       where: { id },
       include: {
         translations: locale ? { where: { locale } } : true,
+        images: { orderBy: { sortOrder: 'asc' } },
         variants: {
           where: { isActive: true },
           include: { prices: { where: { isActive: true } } },
@@ -123,6 +125,15 @@ export class ProductsService {
             microStory: t.microStory,
           })),
         },
+        images: data.images?.length ? {
+          create: data.images.map((img, i) => ({
+            url: img.url,
+            altAr: img.altAr,
+            altEn: img.altEn,
+            sortOrder: i,
+            isPrimary: i === 0,
+          })),
+        } : undefined,
         variants: {
           create: data.variants.map(v => ({
             name: v.name,
@@ -385,5 +396,68 @@ export class ProductsService {
         isActive: price.isActive,
       })),
     }));
+  }
+
+  async addImage(productId: string, url: string, altAr?: string, altEn?: string) {
+    const product = await this.findById(productId);
+    const count = await this.prisma.productImage.count({ where: { productId } });
+    const image = await this.prisma.productImage.create({
+      data: {
+        productId,
+        url,
+        altAr,
+        altEn,
+        sortOrder: count,
+        isPrimary: count === 0,
+      },
+    });
+    if (image.isPrimary) {
+      await this.prisma.product.update({ where: { id: productId }, data: { imageUrl: url } });
+    }
+    return image;
+  }
+
+  async updateImage(imageId: string, data: { altAr?: string; altEn?: string; sortOrder?: number }) {
+    return this.prisma.productImage.update({ where: { id: imageId }, data });
+  }
+
+  async deleteImage(productId: string, imageId: string) {
+    const image = await this.prisma.productImage.findUnique({ where: { id: imageId } });
+    if (!image || image.productId !== productId) throw new NotFoundException('Image not found');
+    const wasPrimary = image.isPrimary;
+    await this.prisma.productImage.delete({ where: { id: imageId } });
+    if (wasPrimary) {
+      const next = await this.prisma.productImage.findFirst({
+        where: { productId },
+        orderBy: { sortOrder: 'asc' },
+      });
+      if (next) {
+        await this.prisma.productImage.update({ where: { id: next.id }, data: { isPrimary: true } });
+        await this.prisma.product.update({ where: { id: productId }, data: { imageUrl: next.url } });
+      } else {
+        await this.prisma.product.update({ where: { id: productId }, data: { imageUrl: null } });
+      }
+    }
+  }
+
+  async setPrimaryImage(productId: string, imageId: string) {
+    const image = await this.prisma.productImage.findUnique({ where: { id: imageId } });
+    if (!image || image.productId !== productId) throw new NotFoundException('Image not found');
+    await this.prisma.productImage.updateMany({
+      where: { productId, isPrimary: true },
+      data: { isPrimary: false },
+    });
+    await this.prisma.productImage.update({ where: { id: imageId }, data: { isPrimary: true } });
+    await this.prisma.product.update({ where: { id: productId }, data: { imageUrl: image.url } });
+    return image;
+  }
+
+  async reorderImages(productId: string, imageIds: string[]) {
+    for (let i = 0; i < imageIds.length; i++) {
+      await this.prisma.productImage.updateMany({
+        where: { id: imageIds[i], productId },
+        data: { sortOrder: i },
+      });
+    }
   }
 }

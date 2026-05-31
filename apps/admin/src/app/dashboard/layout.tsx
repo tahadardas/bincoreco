@@ -43,8 +43,16 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   ];
 
   return (
-    <div dir="rtl">
-      <div className="sidebar">
+    <div dir="rtl" style={{ position: 'relative' }}>
+      {/* Pattern overlay for admin - very subtle */}
+      <div style={{
+        position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0,
+        backgroundImage: 'url(/brand/banco-arabesque-pattern.svg)',
+        backgroundSize: '400px 400px',
+        opacity: 0.025,
+        color: 'rgba(201, 150, 26, 0.6)',
+      }} />
+      <div className="sidebar" style={{ position: 'relative', zIndex: 1 }}>
         <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--br-gold)', marginBottom: 24, textAlign: 'center' }}>
           Banco Ricco
         </div>

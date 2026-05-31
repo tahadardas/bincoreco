@@ -129,4 +129,64 @@ export class ProductsController {
     await this.productsService.remove(id, getAuditContext(req));
     return successResponse(null, 'Product removed');
   }
+
+  @Post('admin/products/:id/images')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin', 'maestro')
+  @ApiBearerAuth()
+  async addImage(
+    @Param('id') id: string,
+    @Body() body: { url: string; altAr?: string; altEn?: string },
+  ) {
+    const image = await this.productsService.addImage(id, body.url, body.altAr, body.altEn);
+    return successResponse(image, 'Image added');
+  }
+
+  @Patch('admin/products/:id/images/:imageId')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin', 'maestro')
+  @ApiBearerAuth()
+  async updateImage(
+    @Param('imageId') imageId: string,
+    @Body() body: { altAr?: string; altEn?: string; sortOrder?: number },
+  ) {
+    const image = await this.productsService.updateImage(imageId, body);
+    return successResponse(image, 'Image updated');
+  }
+
+  @Delete('admin/products/:id/images/:imageId')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin', 'maestro')
+  @ApiBearerAuth()
+  async deleteImage(
+    @Param('id') id: string,
+    @Param('imageId') imageId: string,
+  ) {
+    await this.productsService.deleteImage(id, imageId);
+    return successResponse(null, 'Image deleted');
+  }
+
+  @Patch('admin/products/:id/images/:imageId/primary')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin', 'maestro')
+  @ApiBearerAuth()
+  async setPrimaryImage(
+    @Param('id') id: string,
+    @Param('imageId') imageId: string,
+  ) {
+    const image = await this.productsService.setPrimaryImage(id, imageId);
+    return successResponse(image, 'Primary image set');
+  }
+
+  @Patch('admin/products/:id/images/reorder')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin', 'maestro')
+  @ApiBearerAuth()
+  async reorderImages(
+    @Param('id') id: string,
+    @Body() body: { imageIds: string[] },
+  ) {
+    await this.productsService.reorderImages(id, body.imageIds);
+    return successResponse(null, 'Images reordered');
+  }
 }

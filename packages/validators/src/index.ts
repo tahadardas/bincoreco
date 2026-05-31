@@ -51,6 +51,11 @@ export const createProductSchema = z.object({
   basePreparationTimeMinutes: z.coerce.number().int().min(1).default(15),
   sortOrder: z.coerce.number().int().default(0),
   grindOptionIds: z.array(z.string().uuid()).optional(),
+  images: z.array(z.object({
+    url: z.string().min(1),
+    altAr: z.string().optional(),
+    altEn: z.string().optional(),
+  })).optional(),
   translations: z.array(z.object({
     locale: z.enum(['ar', 'en']),
     name: z.string().min(1).max(200),

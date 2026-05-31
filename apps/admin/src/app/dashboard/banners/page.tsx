@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { adminFetch } from '@/lib/api';
+import { adminFetch, adminUpload } from '@/lib/api';
 
 interface BannerTranslation {
   locale: 'ar' | 'en';
@@ -11,6 +11,7 @@ interface BannerTranslation {
 interface Banner {
   id: string;
   imageUrl: string;
+  mobileImageUrl?: string | null;
   linkUrl?: string | null;
   sortOrder: number;
   isActive: boolean;
@@ -19,6 +20,7 @@ interface Banner {
 
 interface BannerForm {
   imageUrl: string;
+  mobileImageUrl: string;
   linkUrl: string;
   sortOrder: number;
   isActive: boolean;
@@ -30,6 +32,7 @@ interface BannerForm {
 
 const emptyForm: BannerForm = {
   imageUrl: '',
+  mobileImageUrl: '',
   linkUrl: '',
   sortOrder: 0,
   isActive: true,
@@ -49,6 +52,7 @@ export default function BannersPage() {
   const [saving, setSaving] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<BannerForm>(emptyForm);
+  const [uploading, setUploading] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'hidden'>('all');
   const [error, setError] = useState<string | null>(null);
@@ -88,10 +92,23 @@ export default function BannersPage() {
     setError(null);
   };
 
+  const handleUpload = async (file: File) => {
+    setError(null);
+    setUploading(true);
+    try {
+      const result = await adminUpload(file, 'banners');
+      setForm(prev => ({ ...prev, imageUrl: result.url }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'فشل رفع الصورة');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const save = async () => {
     setError(null);
     if (!form.imageUrl.trim()) {
-      setError('أدخل رابط صورة البنر');
+      setError('ارفع صورة البنر أولاً');
       return;
     }
 
@@ -99,6 +116,7 @@ export default function BannersPage() {
     try {
       const payload = {
         imageUrl: form.imageUrl.trim(),
+        mobileImageUrl: form.mobileImageUrl.trim() || undefined,
         linkUrl: form.linkUrl.trim() || undefined,
         sortOrder: form.sortOrder,
         isActive: form.isActive,
@@ -127,6 +145,7 @@ export default function BannersPage() {
     setEditId(banner.id);
     setForm({
       imageUrl: banner.imageUrl,
+      mobileImageUrl: banner.mobileImageUrl || '',
       linkUrl: banner.linkUrl || '',
       sortOrder: banner.sortOrder,
       isActive: banner.isActive,
@@ -175,8 +194,19 @@ export default function BannersPage() {
       <div className="card" style={{ marginBottom: 24 }}>
         <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>{editId ? 'تعديل بنر' : 'إضافة بنر'}</h2>
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(240px, 1fr) minmax(200px, 1fr) 140px 120px', gap: 12, marginBottom: 16 }}>
-          <input className="input" placeholder="Image URL" value={form.imageUrl} onChange={event => setForm({ ...form, imageUrl: event.target.value })} />
-          <input className="input" placeholder="Link URL" value={form.linkUrl} onChange={event => setForm({ ...form, linkUrl: event.target.value })} />
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 6 }}>صورة البنر (يفضل 1920×720)</div>
+            <label className="btn btn-primary" style={{ display: 'inline-flex', cursor: 'pointer', fontSize: 13 }}>
+              {uploading ? 'جاري الرفع...' : (form.imageUrl ? 'تغيير الصورة' : 'تحميل صورة')}
+              <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={async event => { const file = event.target.files?.[0]; if (file) await handleUpload(file); event.target.value = ''; }} />
+            </label>
+            {form.imageUrl && (
+              <div style={{ marginTop: 8 }}>
+                <img src={form.imageUrl} alt="preview" style={{ width: '100%', maxHeight: 120, objectFit: 'cover', borderRadius: 6 }} />
+              </div>
+            )}
+          </div>
+          <input className="input" placeholder="رابط الرابط (اختياري)" value={form.linkUrl} onChange={event => setForm({ ...form, linkUrl: event.target.value })} />
           <input className="input" type="number" placeholder="الترتيب" value={form.sortOrder} onChange={event => setForm({ ...form, sortOrder: Number(event.target.value) || 0 })} />
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, fontSize: 14 }}>
             <input type="checkbox" checked={form.isActive} onChange={event => setForm({ ...form, isActive: event.target.checked })} />

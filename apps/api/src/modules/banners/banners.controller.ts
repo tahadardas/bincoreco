@@ -16,6 +16,7 @@ const bannerTranslationSchema = z.object({
 
 const createBannerSchema = z.object({
   imageUrl: z.string().min(1),
+  mobileImageUrl: z.string().optional(),
   linkUrl: z.string().optional(),
   sortOrder: z.coerce.number().int().default(0),
   isActive: z.boolean().default(true),

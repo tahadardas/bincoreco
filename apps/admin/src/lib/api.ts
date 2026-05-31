@@ -15,3 +15,22 @@ export async function adminFetch<T>(endpoint: string, options: RequestInit = {})
   if (!data.success) throw new Error(data.message || 'API Error');
   return data.data;
 }
+
+export async function adminUpload(file: File, folder: string = 'products'): Promise<{ url: string }> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('admin_token') : null;
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await fetch(`${API_URL}/admin/media/upload?folder=${folder}`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  });
+  if (res.status === 401) {
+    localStorage.removeItem('admin_token');
+    if (typeof window !== 'undefined') window.location.href = '/login';
+    throw new Error('Unauthorized');
+  }
+  const data = await res.json();
+  if (!data.success) throw new Error(data.message || 'Upload failed');
+  return data.data;
+}
