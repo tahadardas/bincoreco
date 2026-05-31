@@ -11,7 +11,7 @@ import { AuthenticatedRequest } from '../../common/auth/authenticated-request.ty
 import { getAuditContext } from '../../common/audit/audit-context';
 
 const updateSettingSchema = z.object({
-  value: z.string().max(1000).optional().default(''),
+  value: z.string().max(10000).optional().default(''),
 });
 
 type UpdateSettingInput = z.infer<typeof updateSettingSchema>;

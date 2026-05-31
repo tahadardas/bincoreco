@@ -44,6 +44,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     { href: '/dashboard/banners', label: 'البنرات', icon: '🖼️' },
     { href: '/dashboard/reports', label: 'التقارير', icon: '📈' },
     { href: '/dashboard/settings/brand', label: 'العلامة التجارية', icon: '🎨' },
+    { href: '/dashboard/settings/about-page', label: 'صفحة من نحن', icon: '📖' },
+    { href: '/dashboard/settings/contact-page', label: 'صفحة اتصل بنا', icon: '📞' },
     { href: '/dashboard/settings/experience', label: 'التجربة', icon: '✨' },
   ];
 

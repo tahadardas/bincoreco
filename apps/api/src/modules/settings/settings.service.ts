@@ -45,7 +45,7 @@ export class SettingsService {
   }
 
   async getPublicBrandSettings(): Promise<Record<string, string | null>> {
-    const allowedKeys = [
+    const allowedKeys: string[] = [
       'brand_logo_main',
       'brand_logo_dark',
       'brand_logo_light',
@@ -62,6 +62,26 @@ export class SettingsService {
       'contact_instagram',
       'contact_email',
     ];
+    const aboutKeys = [
+      'about_hero_title', 'about_hero_sub',
+      'about_story_title', 'about_story_p1', 'about_story_p2',
+      'about_philosophy_title', 'about_philosophy_p1', 'about_philosophy_p2',
+      'about_maestro_title', 'about_maestro_p1',
+      'about_experience_title', 'about_experience_p1', 'about_experience_p2', 'about_experience_p3', 'about_experience_p4',
+      'about_cta_title', 'about_cta_sub',
+      'about_order_now', 'about_view_products',
+    ];
+    for (const k of aboutKeys) {
+      allowedKeys.push(`${k}_ar`, `${k}_en`);
+    }
+    const contactKeys = [
+      'contact_hero_title', 'contact_hero_sub',
+      'contact_form_title', 'contact_map_title',
+      'contact_success_msg', 'contact_cta_order', 'contact_cta_whatsapp',
+    ];
+    for (const k of contactKeys) {
+      allowedKeys.push(`${k}_ar`, `${k}_en`);
+    }
     const keys = await this.prisma.setting.findMany({
       where: { key: { in: allowedKeys } },
     });

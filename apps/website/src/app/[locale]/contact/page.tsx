@@ -22,6 +22,20 @@ const defaults = {
   contact_address: 'Damascus, Al-Mazzeh, Syria',
   contact_hours: 'Sat–Thu: 8:00 AM – 11:00 PM',
   contact_instagram: '@banco.ricco',
+  contact_hero_title_ar: '',
+  contact_hero_title_en: '',
+  contact_hero_sub_ar: '',
+  contact_hero_sub_en: '',
+  contact_form_title_ar: '',
+  contact_form_title_en: '',
+  contact_map_title_ar: '',
+  contact_map_title_en: '',
+  contact_success_msg_ar: '',
+  contact_success_msg_en: '',
+  contact_cta_order_ar: '',
+  contact_cta_order_en: '',
+  contact_cta_whatsapp_ar: '',
+  contact_cta_whatsapp_en: '',
 };
 
 function SectionHeader({ eyebrow, title }: { eyebrow: string; title: string }) {
@@ -50,13 +64,28 @@ export default function ContactPage() {
 
   useEffect(() => {
     api.get<Record<string, string | null>>('/settings/public-brand').then((data) => {
-      setContactVals({
+      setContactVals(prev => ({
+        ...prev,
         contact_phone: data.contact_phone || defaults.contact_phone,
         contact_whatsapp: data.contact_whatsapp || defaults.contact_whatsapp,
         contact_address: data.contact_address || defaults.contact_address,
         contact_hours: data.contact_hours || defaults.contact_hours,
         contact_instagram: data.contact_instagram || defaults.contact_instagram,
-      });
+        contact_hero_title_ar: data.contact_hero_title_ar || '',
+        contact_hero_title_en: data.contact_hero_title_en || '',
+        contact_hero_sub_ar: data.contact_hero_sub_ar || '',
+        contact_hero_sub_en: data.contact_hero_sub_en || '',
+        contact_form_title_ar: data.contact_form_title_ar || '',
+        contact_form_title_en: data.contact_form_title_en || '',
+        contact_map_title_ar: data.contact_map_title_ar || '',
+        contact_map_title_en: data.contact_map_title_en || '',
+        contact_success_msg_ar: data.contact_success_msg_ar || '',
+        contact_success_msg_en: data.contact_success_msg_en || '',
+        contact_cta_order_ar: data.contact_cta_order_ar || '',
+        contact_cta_order_en: data.contact_cta_order_en || '',
+        contact_cta_whatsapp_ar: data.contact_cta_whatsapp_ar || '',
+        contact_cta_whatsapp_en: data.contact_cta_whatsapp_en || '',
+      }));
     }).catch(() => {});
   }, []);
 
@@ -112,10 +141,10 @@ export default function ContactPage() {
             {dict.nav.contact}
           </div>
           <h1 style={{ fontSize: 48, lineHeight: 1.1, fontWeight: 900, color: 'var(--br-gold-light)', marginBottom: 14 }}>
-            {dict.contact.heroTitle}
+            {contactVals[`contact_hero_title_${locale}`] || dict.contact.heroTitle}
           </h1>
           <p style={{ fontSize: 18, color: 'rgba(255,250,240,0.82)', maxWidth: 540, margin: '0 auto' }}>
-            {dict.contact.heroSub}
+            {contactVals[`contact_hero_sub_${locale}`] || dict.contact.heroSub}
           </p>
         </div>
       </section>
@@ -124,7 +153,7 @@ export default function ContactPage() {
       <RevealSection>
         <section className="page-shell">
           <div className="container">
-            <SectionHeader eyebrow={dict.nav.contact} title={dict.contact.heroTitle} />
+            <SectionHeader eyebrow={dict.nav.contact} title={contactVals[`contact_hero_title_${locale}`] || dict.contact.heroTitle} />
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
@@ -150,15 +179,15 @@ export default function ContactPage() {
               <div className="card" style={{ padding: 40, textAlign: 'center' }}>
                 <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
                 <h3 style={{ fontSize: 22, fontWeight: 900, marginBottom: 8, color: 'var(--br-success)' }}>
-                  {dict.contact.successMsg}
+                  {contactVals[`contact_success_msg_${locale}`] || dict.contact.successMsg}
                 </h3>
                 <EspressoButton onClick={() => setSent(false)} tone="outline" size="small">
-                  {dict.contact.formTitle}
+                  {contactVals[`contact_form_title_${locale}`] || dict.contact.formTitle}
                 </EspressoButton>
               </div>
             ) : (
               <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 16 }}>
-                <SectionHeader eyebrow={dict.nav.contact} title={dict.contact.formTitle} />
+                <SectionHeader eyebrow={dict.nav.contact} title={contactVals[`contact_form_title_${locale}`] || dict.contact.formTitle} />
 
                 {error && (
                   <div style={{
@@ -202,7 +231,7 @@ export default function ContactPage() {
       <RevealSection>
         <section style={{ padding: '0 0 64px' }}>
           <div className="container">
-            <SectionHeader eyebrow={dict.nav.contact} title={dict.contact.mapPlaceholder} />
+            <SectionHeader eyebrow={dict.nav.contact} title={contactVals[`contact_map_title_${locale}`] || dict.contact.mapPlaceholder} />
             <div className="card" style={{ overflow: 'hidden' }}>
               <div style={{
                 width: '100%',
@@ -222,7 +251,7 @@ export default function ContactPage() {
                   allowFullScreen
                   loading="lazy"
                   referrerPolicy="no-referrer-when-downgrade"
-                  title={dict.contact.mapPlaceholder}
+                  title={contactVals[`contact_map_title_${locale}`] || dict.contact.mapPlaceholder}
                 />
               </div>
             </div>
@@ -240,17 +269,17 @@ export default function ContactPage() {
         }}>
           <div className="container" style={{ display: 'grid', gap: 20, justifyItems: 'center' }}>
             <h2 style={{ fontSize: 30, fontWeight: 900, color: 'var(--br-gold-light)' }}>
-              {dict.contact.heroTitle}
+              {contactVals[`contact_hero_title_${locale}`] || dict.contact.heroTitle}
             </h2>
             <p style={{ color: 'rgba(255,250,240,0.78)', maxWidth: 500 }}>
-              {dict.contact.heroSub}
+              {contactVals[`contact_hero_sub_${locale}`] || dict.contact.heroSub}
             </p>
             <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
               <EspressoButton size="large" onClick={() => router.push(`/${locale}/products`)}>
-                {dict.contact.ctaOrder}
+                {contactVals[`contact_cta_order_${locale}`] || dict.contact.ctaOrder}
               </EspressoButton>
               <EspressoButton tone="outline" size="large" onClick={() => window.open(`https://wa.me/${contactVals.contact_whatsapp.replace(/[^0-9]/g, '')}`, '_blank')}>
-                {dict.contact.ctaWhatsapp}
+                {contactVals[`contact_cta_whatsapp_${locale}`] || dict.contact.ctaWhatsapp}
               </EspressoButton>
             </div>
           </div>
