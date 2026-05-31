@@ -54,6 +54,7 @@ export class SettingsService {
       'brand_fallback_image',
       'brand_pattern',
       'brand_footer_logo',
+      'brand_pattern_opacity',
       'contact_phone',
       'contact_whatsapp',
       'contact_address',

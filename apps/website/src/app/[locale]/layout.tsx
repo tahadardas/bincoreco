@@ -15,8 +15,13 @@ export default async function LocaleLayout({ children, params }: { children: Rea
   const patternUrl = resolveBrandAsset(brand.brand_pattern, '/brand/banco-arabesque-pattern.svg');
   const faviconUrl = resolveMediaUrl(brand.brand_favicon) || '/favicon.ico';
 
+  const patternOpacity = brand.brand_pattern_opacity
+    ? parseFloat(brand.brand_pattern_opacity)
+    : 0.08;
+
   const brandVars = {
     '--br-brand-pattern-url': `url("${patternUrl}")`,
+    '--br-pattern-opacity': patternOpacity,
   } as React.CSSProperties;
 
   return (

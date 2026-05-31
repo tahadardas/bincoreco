@@ -12,17 +12,19 @@ interface BrandSettings {
   brand_fallback_image?: string;
   brand_pattern?: string;
   brand_footer_logo?: string;
+  brand_pattern_opacity?: string;
 }
 
 const fields = [
-  { key: 'brand_logo_main', label: 'الشعار الرئيسي', desc: 'يظهر في الهيدر والعلامة التجارية' },
-  { key: 'brand_logo_dark', label: 'الشعار الداكن', desc: 'للاستخدام على الخلفيات الفاتحة' },
-  { key: 'brand_logo_light', label: 'الشعار الفاتح', desc: 'للاستخدام على الخلفيات الداكنة' },
-  { key: 'brand_mark', label: 'العلامة المختصرة (BR Mark)', desc: 'رمز Banco Ricco المختصر' },
-  { key: 'brand_favicon', label: 'أيقونة المتصفح (Favicon)', desc: 'ظهور في تبويب المتصفح' },
-  { key: 'brand_fallback_image', label: 'صورة احتياطية', desc: 'تظهر عند عدم وجود صورة للمنتج' },
-  { key: 'brand_pattern', label: 'النقش المزخرف (Pattern)', desc: 'خلفية عربية مزخرفة' },
-  { key: 'brand_footer_logo', label: 'شعار الفوتر', desc: 'يظهر في تذييل الموقع' },
+  { key: 'brand_logo_main', label: 'الشعار الرئيسي', desc: 'يظهر في الهيدر والعلامة التجارية', isImage: true },
+  { key: 'brand_logo_dark', label: 'الشعار الداكن', desc: 'للاستخدام على الخلفيات الفاتحة', isImage: true },
+  { key: 'brand_logo_light', label: 'الشعار الفاتح', desc: 'للاستخدام على الخلفيات الداكنة', isImage: true },
+  { key: 'brand_mark', label: 'العلامة المختصرة (BR Mark)', desc: 'رمز Banco Ricco المختصر', isImage: true },
+  { key: 'brand_favicon', label: 'أيقونة المتصفح (Favicon)', desc: 'ظهور في تبويب المتصفح', isImage: true },
+  { key: 'brand_fallback_image', label: 'صورة احتياطية', desc: 'تظهر عند عدم وجود صورة للمنتج', isImage: true },
+  { key: 'brand_pattern', label: 'النقش المزخرف (Pattern)', desc: 'خلفية عربية مزخرفة', isImage: true },
+  { key: 'brand_footer_logo', label: 'شعار الفوتر', desc: 'يظهر في تذييل الموقع', isImage: true },
+  { key: 'brand_pattern_opacity', label: 'كثافة النقش (0.00–1.00)', desc: 'افتراضي 0.08 · كلما زاد الرقم زاد الوضوح', isImage: false },
 ];
 
 const previewKeys = ['brand_mark', 'brand_pattern', 'brand_favicon', 'brand_footer_logo', 'brand_fallback_image'] as const;
@@ -138,31 +140,53 @@ export default function BrandSettingsPage() {
           {fields.map(field => {
             const value = settings[field.key as keyof BrandSettings];
             const resolvedUrl = value ? resolveMediaUrl(value) : null;
+            if (field.isImage) {
+              return (
+                <div key={field.key} className="admin-setting-row">
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 14 }}>{field.label}</div>
+                    <div style={{ fontSize: 12, color: 'var(--br-muted)' }}>{field.desc}</div>
+                  </div>
+                  <div>
+                    {value ? (
+                      <div className="admin-actions-row">
+                        <img src={resolvedUrl || ''} alt={field.label} className="admin-preview-thumb" />
+                        <button className="btn btn-sm" style={{ background: '#fee', fontSize: 12 }} onClick={() => handleRemove(field.key)}>
+                          إزالة
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{ color: 'var(--br-muted)', fontSize: 13, fontStyle: 'italic' }}>
+                        (افتراضي)
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <label className="btn btn-primary btn-sm" style={{ cursor: uploading === field.key ? 'wait' : 'pointer', fontSize: 12, width: '100%', textAlign: 'center' }}>
+                      {uploading === field.key ? '...جاري' : 'رفع'}
+                      <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" style={{ display: 'none' }} disabled={uploading !== null} onChange={async e => { const f = e.target.files?.[0]; if (f) await handleUpload(field.key, f); e.target.value = ''; }} />
+                    </label>
+                  </div>
+                </div>
+              );
+            }
             return (
-              <div key={field.key} className="admin-setting-row">
+              <div key={field.key} className="admin-setting-row" style={{ gridTemplateColumns: '220px minmax(0, 1fr)' }}>
                 <div>
                   <div style={{ fontWeight: 700, fontSize: 14 }}>{field.label}</div>
                   <div style={{ fontSize: 12, color: 'var(--br-muted)' }}>{field.desc}</div>
                 </div>
                 <div>
-                  {value ? (
-                    <div className="admin-actions-row">
-                      <img src={resolvedUrl || ''} alt={field.label} className="admin-preview-thumb" />
-                      <button className="btn btn-sm" style={{ background: '#fee', fontSize: 12 }} onClick={() => handleRemove(field.key)}>
-                        إزالة
-                      </button>
-                    </div>
-                  ) : (
-                    <div style={{ color: 'var(--br-muted)', fontSize: 13, fontStyle: 'italic' }}>
-                      (افتراضي)
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <label className="btn btn-primary btn-sm" style={{ cursor: uploading === field.key ? 'wait' : 'pointer', fontSize: 12, width: '100%', textAlign: 'center' }}>
-                    {uploading === field.key ? '...جاري' : 'رفع'}
-                    <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" style={{ display: 'none' }} disabled={uploading !== null} onChange={async e => { const f = e.target.files?.[0]; if (f) await handleUpload(field.key, f); e.target.value = ''; }} />
-                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="1"
+                    className="input"
+                    placeholder="0.08"
+                    value={value || ''}
+                    onChange={e => setSettings(prev => ({ ...prev, [field.key]: e.target.value }))}
+                  />
                 </div>
               </div>
             );

@@ -9,6 +9,7 @@ export interface PublicBrandSettings {
   brand_fallback_image: string | null;
   brand_pattern: string | null;
   brand_footer_logo: string | null;
+  brand_pattern_opacity: string | null;
 }
 
 export const defaultBrandSettings: PublicBrandSettings = {
@@ -20,6 +21,7 @@ export const defaultBrandSettings: PublicBrandSettings = {
   brand_fallback_image: null,
   brand_pattern: '/brand/banco-arabesque-pattern.svg',
   brand_footer_logo: null,
+  brand_pattern_opacity: null,
 };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
@@ -47,6 +49,7 @@ export async function getPublicBrandSettings(): Promise<PublicBrandSettings> {
       brand_fallback_image: data.brand_fallback_image ?? defaultBrandSettings.brand_fallback_image,
       brand_pattern: data.brand_pattern ?? defaultBrandSettings.brand_pattern,
       brand_footer_logo: data.brand_footer_logo ?? defaultBrandSettings.brand_footer_logo,
+      brand_pattern_opacity: data.brand_pattern_opacity ?? defaultBrandSettings.brand_pattern_opacity,
     };
   } catch {
     return { ...defaultBrandSettings };
