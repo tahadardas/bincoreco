@@ -17,6 +17,8 @@ import { HealthModule } from './modules/health/health.module';
 import { BannersModule } from './modules/banners/banners.module';
 import { MediaModule } from './modules/media/media.module';
 import { LoyaltyModule } from './modules/loyalty/loyalty.module';
+import { ReviewsModule } from './modules/reviews/reviews.module';
+import { ContactMessagesModule } from './modules/contact-messages/contact-messages.module';
 
 @Module({
   imports: [
@@ -37,6 +39,8 @@ import { LoyaltyModule } from './modules/loyalty/loyalty.module';
     BannersModule,
     MediaModule,
     LoyaltyModule,
+    ReviewsModule,
+    ContactMessagesModule,
   ],
   providers: [
     {

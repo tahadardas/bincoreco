@@ -14,6 +14,16 @@ interface Banner {
   imageUrl: string;
   mobileImageUrl?: string | null;
   linkUrl?: string | null;
+  ctaTextAr?: string | null;
+  ctaTextEn?: string | null;
+  ctaUrl?: string | null;
+  animationType?: string;
+  displayMode?: string;
+  overlayOpacity?: number;
+  textPosition?: string;
+  textColor?: string;
+  startsAt?: string | null;
+  endsAt?: string | null;
   sortOrder: number;
   isActive: boolean;
   translations: BannerTranslation[];
@@ -23,6 +33,16 @@ interface BannerForm {
   imageUrl: string;
   mobileImageUrl: string;
   linkUrl: string;
+  ctaTextAr: string;
+  ctaTextEn: string;
+  ctaUrl: string;
+  animationType: string;
+  displayMode: string;
+  overlayOpacity: number;
+  textPosition: string;
+  textColor: string;
+  startsAt: string;
+  endsAt: string;
   sortOrder: number;
   isActive: boolean;
   titleAr: string;
@@ -35,6 +55,16 @@ const emptyForm: BannerForm = {
   imageUrl: '',
   mobileImageUrl: '',
   linkUrl: '',
+  ctaTextAr: '',
+  ctaTextEn: '',
+  ctaUrl: '',
+  animationType: 'fade',
+  displayMode: 'fullWidthHero',
+  overlayOpacity: 0.35,
+  textPosition: 'center',
+  textColor: 'light',
+  startsAt: '',
+  endsAt: '',
   sortOrder: 0,
   isActive: true,
   titleAr: '',
@@ -120,6 +150,16 @@ export default function BannersPage() {
         imageUrl: form.imageUrl.trim(),
         mobileImageUrl: form.mobileImageUrl.trim() || undefined,
         linkUrl: form.linkUrl.trim() || undefined,
+        ctaTextAr: form.ctaTextAr.trim() || undefined,
+        ctaTextEn: form.ctaTextEn.trim() || undefined,
+        ctaUrl: form.ctaUrl.trim() || undefined,
+        animationType: form.animationType || 'fade',
+        displayMode: form.displayMode || 'fullWidthHero',
+        overlayOpacity: form.overlayOpacity,
+        textPosition: form.textPosition || 'center',
+        textColor: form.textColor || 'light',
+        startsAt: form.startsAt || null,
+        endsAt: form.endsAt || null,
         sortOrder: form.sortOrder,
         isActive: form.isActive,
         translations: [
@@ -149,6 +189,16 @@ export default function BannersPage() {
       imageUrl: banner.imageUrl,
       mobileImageUrl: banner.mobileImageUrl || '',
       linkUrl: banner.linkUrl || '',
+      ctaTextAr: banner.ctaTextAr || '',
+      ctaTextEn: banner.ctaTextEn || '',
+      ctaUrl: banner.ctaUrl || '',
+      animationType: banner.animationType || 'fade',
+      displayMode: banner.displayMode || 'fullWidthHero',
+      overlayOpacity: banner.overlayOpacity ?? 0.35,
+      textPosition: banner.textPosition || 'center',
+      textColor: banner.textColor || 'light',
+      startsAt: banner.startsAt ? banner.startsAt.slice(0, 16) : '',
+      endsAt: banner.endsAt ? banner.endsAt.slice(0, 16) : '',
       sortOrder: banner.sortOrder,
       isActive: banner.isActive,
       titleAr: ar?.title || '',
@@ -197,9 +247,9 @@ export default function BannersPage() {
 
       <div className="card" style={{ marginBottom: 24 }}>
         <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>{editId ? 'تعديل بنر' : 'إضافة بنر'}</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(240px, 1fr) minmax(200px, 1fr) 140px 120px', gap: 12, marginBottom: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 16 }}>
           <div>
-            <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 6 }}>صورة البنر (يفضل 1920×720)</div>
+            <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 6 }}>صورة سطح المكتب (يفضل 1920×720)</div>
             <label className="btn btn-primary" style={{ display: 'inline-flex', cursor: 'pointer', fontSize: 13 }}>
               {uploading ? 'جاري الرفع...' : (form.imageUrl ? 'تغيير الصورة' : 'تحميل صورة')}
               <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={async event => { const file = event.target.files?.[0]; if (file) await handleUpload(file); event.target.value = ''; }} />
@@ -210,12 +260,46 @@ export default function BannersPage() {
               </div>
             )}
           </div>
-          <input className="input" placeholder="رابط الرابط (اختياري)" value={form.linkUrl} onChange={event => setForm({ ...form, linkUrl: event.target.value })} />
-          <input className="input" type="number" placeholder="الترتيب" value={form.sortOrder} onChange={event => setForm({ ...form, sortOrder: Number(event.target.value) || 0 })} />
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 6 }}>صورة الجوال</div>
+            <input className="input" placeholder="رابط صورة الجوال" value={form.mobileImageUrl} onChange={event => setForm({ ...form, mobileImageUrl: event.target.value })} />
+          </div>
+          <input className="input" placeholder="رابط الرابط" value={form.linkUrl} onChange={event => setForm({ ...form, linkUrl: event.target.value })} />
+          <input className="input" placeholder="نص CTA (عربي)" value={form.ctaTextAr} onChange={event => setForm({ ...form, ctaTextAr: event.target.value })} />
+          <input className="input" placeholder="CTA text (EN)" value={form.ctaTextEn} onChange={event => setForm({ ...form, ctaTextEn: event.target.value })} />
+          <input className="input" placeholder="رابط CTA" value={form.ctaUrl} onChange={event => setForm({ ...form, ctaUrl: event.target.value })} />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 16 }}>
+          <select className="input" value={form.animationType} onChange={event => setForm({ ...form, animationType: event.target.value })}>
+            <option value="fade">Fade</option>
+            <option value="slide">Slide</option>
+            <option value="zoom">Zoom</option>
+          </select>
+          <select className="input" value={form.displayMode} onChange={event => setForm({ ...form, displayMode: event.target.value })}>
+            <option value="fullWidthHero">Full Width Hero</option>
+            <option value="contained">Contained</option>
+            <option value="split">Split</option>
+          </select>
+          <input className="input" type="number" step="0.05" min="0" max="1" placeholder="عتامة التغطية" value={form.overlayOpacity} onChange={event => setForm({ ...form, overlayOpacity: Number(event.target.value) || 0.35 })} />
+          <select className="input" value={form.textPosition} onChange={event => setForm({ ...form, textPosition: event.target.value })}>
+            <option value="center">وسط</option>
+            <option value="left">يسار</option>
+            <option value="right">يمين</option>
+            <option value="bottom">أسفل</option>
+          </select>
+          <select className="input" value={form.textColor} onChange={event => setForm({ ...form, textColor: event.target.value })}>
+            <option value="light">فاتح</option>
+            <option value="dark">داكن</option>
+          </select>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, fontSize: 14 }}>
             <input type="checkbox" checked={form.isActive} onChange={event => setForm({ ...form, isActive: event.target.checked })} />
             نشط
           </label>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 16 }}>
+          <input className="input" type="datetime-local" placeholder="يبدأ من" value={form.startsAt} onChange={event => setForm({ ...form, startsAt: event.target.value })} />
+          <input className="input" type="datetime-local" placeholder="ينتهي في" value={form.endsAt} onChange={event => setForm({ ...form, endsAt: event.target.value })} />
+          <input className="input" type="number" placeholder="الترتيب" value={form.sortOrder} onChange={event => setForm({ ...form, sortOrder: Number(event.target.value) || 0 })} />
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(240px, 1fr))', gap: 16, marginBottom: 16 }}>

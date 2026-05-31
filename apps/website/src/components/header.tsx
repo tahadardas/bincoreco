@@ -23,6 +23,8 @@ export default function Header() {
         <nav className="br-nav" aria-label="Main navigation">
           <Link href={`/${locale}`}>{dict.nav.home}</Link>
           <Link href={`/${locale}/products`}>{dict.nav.products}</Link>
+          <Link href={`/${locale}/about`}>{dict.nav.about}</Link>
+          <Link href={`/${locale}/contact`}>{dict.nav.contact}</Link>
           <Link href={`/${locale}/cart`}>{dict.nav.cart}</Link>
           {user && <Link href={`/${locale}/orders`}>{dict.nav.orders}</Link>}
           {user && <Link href={`/${locale}/loyalty`}>{dict.nav.loyalty}</Link>}

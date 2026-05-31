@@ -6,6 +6,7 @@ import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import HomeScreen from './src/screens/HomeScreen';
 import ProductsScreen from './src/screens/ProductsScreen';
+import ProductDetailScreen from './src/screens/ProductDetailScreen';
 import CartScreen from './src/screens/CartScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import LoyaltyScreen from './src/screens/LoyaltyScreen';
@@ -80,7 +81,7 @@ export default function App() {
         <Stack.Screen name="Home" options={({ navigation }) => ({ title: 'Banco Ricco', headerRight: () => (
           <HeaderRight locale={locale} token={token} onLogout={handleLogout}
             onToggleLocale={toggleLocale} onLoginNav={() => navigation.navigate('Login')} />
-        )}}>
+        )})}>
           {props => <HomeScreen {...props} locale={locale} />}
         </Stack.Screen>
         <Stack.Screen name="Login" options={{ title: locale === 'ar' ? 'تسجيل الدخول' : 'Login' }}>
@@ -88,6 +89,9 @@ export default function App() {
         </Stack.Screen>
         <Stack.Screen name="Products" options={{ title: locale === 'ar' ? 'المنتجات' : 'Products' }}>
           {props => <ProductsScreen {...props} locale={locale} />}
+        </Stack.Screen>
+        <Stack.Screen name="ProductDetail" options={{ title: locale === 'ar' ? 'تفاصيل المنتج' : 'Product Details' }}>
+          {props => <ProductDetailScreen {...props} locale={locale} token={token} />}
         </Stack.Screen>
         <Stack.Screen name="Cart" options={{ title: locale === 'ar' ? 'السلة' : 'Cart' }}>
           {props => <CartScreen {...props} locale={locale} token={token} onLogin={(t) => { handleLogin(t); props.navigation.goBack(); }} />}

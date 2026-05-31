@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { adminFetch } from '@/lib/api';
 import { formatMoney, MoneyAmount } from '@/lib/money';
+import { resolveMediaUrl } from '@/lib/media';
 
 interface Category {
   id: string;
@@ -19,6 +20,8 @@ interface Product {
   isMaestroPick: boolean;
   isFeatured: boolean;
   sortOrder: number;
+  imageUrl: string | null;
+  images?: { url: string; isPrimary: boolean }[];
   translations: { locale: string; name: string }[];
   category?: Category;
   variants: {
@@ -176,6 +179,7 @@ export default function ProductsPage() {
           <table className="table">
             <thead>
               <tr>
+                <th style={{ minWidth: 60 }}>الصورة</th>
                 <th>SKU</th>
                 <th>الاسم</th>
                 <th>التصنيف</th>
@@ -183,6 +187,7 @@ export default function ProductsPage() {
                 <th>السعر</th>
                 <th>الحالة</th>
                 <th>وسوم</th>
+                <th style={{ minWidth: 60 }}>الصورة</th>
                 <th>الترتيب</th>
                 <th>إجراءات</th>
               </tr>
@@ -190,6 +195,17 @@ export default function ProductsPage() {
             <tbody>
               {products.map(product => (
                 <tr key={product.id}>
+                  <td>
+                    <div style={{ width: 52, height: 52, borderRadius: 8, overflow: 'hidden', background: 'var(--br-cream)', display: 'grid', placeItems: 'center' }}>
+                      {(() => {
+                        const imgUrl = resolveMediaUrl(product.imageUrl || (product.images?.[0]?.url));
+                        if (imgUrl) {
+                          return <img src={imgUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />;
+                        }
+                        return <span style={{ fontSize: 18, fontWeight: 900, color: 'var(--br-gold)' }}>BR</span>;
+                      })()}
+                    </div>
+                  </td>
                   <td style={{ fontFamily: 'monospace', fontSize: 13 }}>{product.sku}</td>
                   <td style={{ fontWeight: 700 }}>{localizedName(product.translations, product.sku)}</td>
                   <td>{product.category ? localizedName(product.category.translations, product.category.slug) : '-'}</td>
@@ -242,7 +258,7 @@ export default function ProductsPage() {
               ))}
               {products.length === 0 && (
                 <tr>
-                  <td colSpan={9} style={{ textAlign: 'center', color: 'var(--br-muted)', padding: 32 }}>
+                  <td colSpan={10} style={{ textAlign: 'center', color: 'var(--br-muted)', padding: 32 }}>
                     لا توجد منتجات ضمن الفلاتر الحالية
                   </td>
                 </tr>

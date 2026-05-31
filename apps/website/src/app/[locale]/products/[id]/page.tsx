@@ -11,6 +11,7 @@ import EspressoButton from '@/components/espresso-button';
 import CupSizeSelector from '@/components/cup-size-selector';
 import { getGuestSession } from '@/lib/guest-session';
 import { resolveMediaUrl } from '@/lib/media';
+import ProductReviews from '@/components/product-reviews';
 
 interface Product {
   id: string;
@@ -374,6 +375,8 @@ export default function ProductDetailPage() {
           </div>
         </div>
       </div>
+
+      <ProductReviews productId={product.id} />
 
       {showAuth && <AuthModal locale={locale} onClose={() => setShowAuth(false)} />}
     </div>

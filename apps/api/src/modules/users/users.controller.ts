@@ -14,14 +14,24 @@ const usersQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional(),
   limit: z.coerce.number().int().positive().max(100).optional(),
   search: z.string().optional(),
+  role: z.string().optional(),
+  isActive: z.coerce.boolean().optional(),
+  fromDate: z.string().optional(),
+  toDate: z.string().optional(),
 });
 
 const updateUserRoleSchema = z.object({
   role: z.enum(['admin', 'maestro', 'staff', 'customer']),
 });
 
+const updateUserStatusSchema = z.object({
+  isActive: z.boolean(),
+  reason: z.string().max(500).optional(),
+});
+
 type UsersQuery = z.infer<typeof usersQuerySchema>;
 type UpdateUserRoleInput = z.infer<typeof updateUserRoleSchema>;
+type UpdateUserStatusInput = z.infer<typeof updateUserStatusSchema>;
 
 @ApiTags('Users')
 @Controller('users')
@@ -33,9 +43,15 @@ export class UsersController {
 
   @Get()
   async findAll(@Query(new ZodValidationPipe(usersQuerySchema)) query: UsersQuery) {
-    const { page, limit, search } = query;
-    const result = await this.usersService.findAll({ page, limit, search });
+    const { page, limit, search, role, isActive, fromDate, toDate } = query;
+    const result = await this.usersService.findAll({ page, limit, search, role, isActive, fromDate, toDate });
     return paginatedResponse(result.items, result.total, result.page, result.limit);
+  }
+
+  @Get(':id')
+  async findOne(@Param('id') id: string) {
+    const user = await this.usersService.findByIdWithDetails(id);
+    return successResponse(user);
   }
 
   @Patch(':id/role')
@@ -47,5 +63,16 @@ export class UsersController {
   ) {
     const user = await this.usersService.updateRole(id, input.role, getAuditContext(req));
     return successResponse(user, 'User role updated');
+  }
+
+  @Patch(':id/status')
+  @Roles('admin')
+  async updateStatus(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(updateUserStatusSchema)) input: UpdateUserStatusInput,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const user = await this.usersService.updateStatus(id, input.isActive, input.reason, getAuditContext(req));
+    return successResponse(user, 'User status updated');
   }
 }
