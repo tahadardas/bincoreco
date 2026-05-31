@@ -3,6 +3,7 @@ import { useRouter } from 'next/navigation';
 import { Locale } from '@/lib/dictionaries';
 import { formatMoney, MoneyAmount } from '@/lib/money';
 import EspressoButton from './espresso-button';
+import { resolveMediaUrl } from '@/lib/media';
 
 export interface ProductSummary {
   id: string;
@@ -51,8 +52,8 @@ export default function ProductCard({ product, locale, labels }: ProductCardProp
   return (
     <article className="card product-card">
       <div className="product-card__media">
-        {product.imageUrl ? (
-          <img src={product.imageUrl} alt={name} />
+        {resolveMediaUrl(product.imageUrl) ? (
+          <img src={resolveMediaUrl(product.imageUrl)!} alt={name} />
         ) : (
           <div className="product-card__fallback"><div className="product-card__fallback-icon">{fallbackLetters(product, locale)}</div></div>
         )}

@@ -32,14 +32,16 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   };
 
   const links = [
-    { href: '/dashboard', label: 'الرئيسية' },
-    { href: '/dashboard/orders', label: 'الطلبات' },
-    { href: '/dashboard/products', label: 'المنتجات' },
-    { href: '/dashboard/categories', label: 'التصنيفات' },
-    { href: '/dashboard/grind-options', label: 'خيارات الطحن' },
-    { href: '/dashboard/loyalty', label: 'الولاء' },
-    { href: '/dashboard/banners', label: 'البنرات' },
-    { href: '/dashboard/reports', label: 'التقارير' },
+    { href: '/dashboard', label: 'الرئيسية', icon: '📊' },
+    { href: '/dashboard/orders', label: 'الطلبات', icon: '📋' },
+    { href: '/dashboard/products', label: 'المنتجات', icon: '🫘' },
+    { href: '/dashboard/categories', label: 'التصنيفات', icon: '🏷️' },
+    { href: '/dashboard/grind-options', label: 'خيارات الطحن', icon: '⚙️' },
+    { href: '/dashboard/loyalty', label: 'الولاء', icon: '🎖️' },
+    { href: '/dashboard/banners', label: 'البنرات', icon: '🖼️' },
+    { href: '/dashboard/reports', label: 'التقارير', icon: '📈' },
+    { href: '/dashboard/settings/brand', label: 'العلامة التجارية', icon: '🎨' },
+    { href: '/dashboard/settings/experience', label: 'التجربة', icon: '✨' },
   ];
 
   return (
@@ -65,6 +67,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             href={link.href}
             className={pathname === link.href || (link.href !== '/dashboard' && pathname.startsWith(`${link.href}/`)) ? 'active' : ''}
           >
+            <span className="sidebar-icon">{link.icon}</span>
             {link.label}
           </Link>
         ))}

@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { adminFetch, adminUpload } from '@/lib/api';
+import { resolveMediaUrl } from '@/lib/media';
 
 interface BannerTranslation {
   locale: 'ar' | 'en';
@@ -56,6 +57,7 @@ export default function BannersPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'hidden'>('all');
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
   const filteredBanners = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -165,12 +167,14 @@ export default function BannersPage() {
       });
       await load();
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'تعذر تحديث حالة البنر');
+      setError(err instanceof Error ? err.message : 'تعذر تحديث حالة البنر');
     }
   };
 
   const remove = async (banner: Banner) => {
     const title = translation(banner, 'ar')?.title || banner.imageUrl;
+    setToast(title);
+    setTimeout(() => setToast(null), 200);
     if (!window.confirm(`تأكيد حذف البنر "${title}"؟`)) {
       return;
     }
@@ -178,7 +182,7 @@ export default function BannersPage() {
       await adminFetch(`/admin/banners/${banner.id}`, { method: 'DELETE' });
       await load();
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'تعذر حذف البنر');
+      setError(err instanceof Error ? err.message : 'تعذر حذف البنر');
     }
   };
 
@@ -202,7 +206,7 @@ export default function BannersPage() {
             </label>
             {form.imageUrl && (
               <div style={{ marginTop: 8 }}>
-                <img src={form.imageUrl} alt="preview" style={{ width: '100%', maxHeight: 120, objectFit: 'cover', borderRadius: 6 }} />
+                <img src={resolveMediaUrl(form.imageUrl) || ''} alt="preview" style={{ width: '100%', maxHeight: 120, objectFit: 'cover', borderRadius: 6 }} />
               </div>
             )}
           </div>
@@ -267,7 +271,7 @@ export default function BannersPage() {
                 return (
                   <tr key={banner.id}>
                     <td>
-                      <img src={banner.imageUrl} alt={ar?.title || en?.title || 'Banner'} style={{ width: 96, height: 48, objectFit: 'cover', borderRadius: 6, background: 'var(--br-cream)' }} />
+                      <img src={resolveMediaUrl(banner.imageUrl) || ''} alt={ar?.title || en?.title || 'Banner'} style={{ width: 96, height: 48, objectFit: 'cover', borderRadius: 6, background: 'var(--br-cream)' }} />
                     </td>
                     <td style={{ fontWeight: 700 }}>{ar?.title || '-'}</td>
                     <td>{en?.title || '-'}</td>

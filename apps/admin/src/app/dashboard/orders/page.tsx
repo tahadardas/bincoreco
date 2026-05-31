@@ -158,7 +158,7 @@ export default function OrdersPage() {
       });
       await loadOrders();
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'تعذر تحديث حالة الطلب');
+      setError(err instanceof Error ? err.message : 'تعذر تحديث حالة الطلب');
     } finally {
       setUpdatingId(null);
     }

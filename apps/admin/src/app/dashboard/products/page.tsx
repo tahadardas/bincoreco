@@ -65,6 +65,7 @@ export default function ProductsPage() {
   const [bestSellerFilter, setBestSellerFilter] = useState<BooleanFilter>('all');
   const [maestroFilter, setMaestroFilter] = useState<BooleanFilter>('all');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [updateError, setUpdateError] = useState<string | null>(null);
 
   const queryString = useMemo(() => {
     const query = new URLSearchParams({ limit: '200', locale: 'ar' });
@@ -102,6 +103,7 @@ export default function ProductsPage() {
 
   const patchProduct = async (product: Product, data: Partial<Pick<Product, 'isActive' | 'isBestSeller' | 'isMaestroPick'>>) => {
     setUpdatingId(product.id);
+    setUpdateError(null);
     try {
       await adminFetch(`/admin/products/${product.id}`, {
         method: 'PATCH',
@@ -109,7 +111,7 @@ export default function ProductsPage() {
       });
       await loadProducts();
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'تعذر تحديث المنتج');
+      setUpdateError(err instanceof Error ? err.message : 'تعذر تحديث المنتج');
     } finally {
       setUpdatingId(null);
     }
@@ -167,6 +169,7 @@ export default function ProductsPage() {
 
       {loading && <div style={{ padding: 40 }}>جاري تحميل المنتجات...</div>}
       {error && !loading && <div className="card" style={{ color: 'var(--br-danger)' }}>{error}</div>}
+      {updateError && <div className="card" style={{ color: 'var(--br-danger)', marginBottom: 16 }}>{updateError}</div>}
 
       {!loading && !error && (
         <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
