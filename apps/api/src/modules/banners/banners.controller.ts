@@ -8,24 +8,47 @@ import { Roles } from '../../common/auth/roles.decorator';
 import { RolesGuard } from '../../common/auth/roles.guard';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 
+const animationTypeEnum = z.enum([
+  'fade',
+  'slideLeft',
+  'slideRight',
+  'slideUp',
+  'slideDown',
+  'zoomIn',
+  'parallax',
+  'none',
+]);
+
+const displayModeEnum = z.enum([
+  'fullWidthHero',
+  'contained',
+  'card',
+  'splitImageText',
+  'backgroundWithOverlay',
+]);
+
+const textPositionEnum = z.enum(['center', 'right', 'left', 'bottom']);
+
+const textColorEnum = z.enum(['light', 'dark']);
+
 const bannerTranslationSchema = z.object({
   locale: z.enum(['ar', 'en']),
   title: z.string().max(200).optional(),
   subtitle: z.string().max(500).optional(),
 });
 
-const createBannerSchema = z.object({
+const bannerBaseSchema = z.object({
   imageUrl: z.string().min(1),
   mobileImageUrl: z.string().optional(),
   linkUrl: z.string().optional(),
   ctaTextAr: z.string().max(200).optional(),
   ctaTextEn: z.string().max(200).optional(),
   ctaUrl: z.string().optional(),
-  animationType: z.string().default('fade'),
-  displayMode: z.string().default('fullWidthHero'),
+  animationType: animationTypeEnum.default('fade'),
+  displayMode: displayModeEnum.default('fullWidthHero'),
   overlayOpacity: z.coerce.number().min(0).max(1).default(0.35),
-  textPosition: z.string().default('center'),
-  textColor: z.string().default('light'),
+  textPosition: textPositionEnum.default('center'),
+  textColor: textColorEnum.default('light'),
   startsAt: z.string().datetime().optional().nullable(),
   endsAt: z.string().datetime().optional().nullable(),
   sortOrder: z.coerce.number().int().default(0),
@@ -33,7 +56,20 @@ const createBannerSchema = z.object({
   translations: z.array(bannerTranslationSchema).optional(),
 });
 
-const updateBannerSchema = createBannerSchema.partial();
+const dateRefine = (data: { startsAt?: string | null; endsAt?: string | null }) => {
+  if (data.startsAt && data.endsAt) {
+    return new Date(data.startsAt) < new Date(data.endsAt);
+  }
+  return true;
+};
+
+const createBannerSchema = bannerBaseSchema.refine(dateRefine, {
+  message: 'endsAt must be after startsAt',
+});
+
+const updateBannerSchema = bannerBaseSchema.partial().refine(dateRefine, {
+  message: 'endsAt must be after startsAt',
+});
 
 type CreateBannerInput = z.infer<typeof createBannerSchema>;
 type UpdateBannerInput = z.infer<typeof updateBannerSchema>;

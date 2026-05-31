@@ -4,7 +4,11 @@ import { useParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { getDictionary, Locale } from '@/lib/dictionaries';
 
-export default function Header() {
+type HeaderProps = {
+  brandMark?: string;
+};
+
+export default function Header({ brandMark }: HeaderProps) {
   const params = useParams();
   const locale = (params.locale as Locale) || 'ar';
   const dict = getDictionary(locale);
@@ -14,7 +18,11 @@ export default function Header() {
     <header className="br-header">
       <div className="container br-header__inner">
         <Link href={`/${locale}`} className="br-brand" aria-label="Banco Ricco">
-          <img src="/brand/br-monogram.png" alt="" className="br-brand__mark" />
+          <img
+            src={brandMark || '/brand/br-monogram.png'}
+            alt=""
+            className="br-brand__mark"
+          />
           <span className="br-brand__name">
             <span className="br-brand__title">Banco Ricco</span>
             <span className="br-brand__subtitle">{dict.home.respectBeans}</span>

@@ -4,6 +4,7 @@ import { Locale } from '@/lib/dictionaries';
 import { formatMoney, MoneyAmount } from '@/lib/money';
 import EspressoButton from './espresso-button';
 import { resolveMediaUrl } from '@/lib/media';
+import { useBrand } from '@/lib/brand-context';
 
 export interface ProductSummary {
   id: string;
@@ -48,12 +49,15 @@ export default function ProductCard({ product, locale, labels }: ProductCardProp
   const t = translated(product, locale);
   const name = t?.name || product.sku;
   const description = t?.shortDescription || '';
+  const brand = useBrand();
 
   return (
     <article className="card product-card">
       <div className="product-card__media">
         {resolveMediaUrl(product.imageUrl) ? (
           <img src={resolveMediaUrl(product.imageUrl)!} alt={name} />
+        ) : brand.resolvedFallbackImage ? (
+          <img src={brand.resolvedFallbackImage} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         ) : (
           <div className="product-card__fallback"><div className="product-card__fallback-icon">{fallbackLetters(product, locale)}</div></div>
         )}

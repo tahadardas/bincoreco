@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { getDictionary, Locale } from '@/lib/dictionaries';
@@ -15,6 +15,14 @@ interface FormState {
 }
 
 const initialForm: FormState = { fullName: '', phone: '', email: '', subject: '', message: '' };
+
+const defaults = {
+  contact_phone: '+963 11 234 5678',
+  contact_whatsapp: '+963 933 123 456',
+  contact_address: 'Damascus, Al-Mazzeh, Syria',
+  contact_hours: 'Sat–Thu: 8:00 AM – 11:00 PM',
+  contact_instagram: '@banco.ricco',
+};
 
 function SectionHeader({ eyebrow, title }: { eyebrow: string; title: string }) {
   return (
@@ -38,6 +46,19 @@ export default function ContactPage() {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
+  const [contactVals, setContactVals] = useState(defaults);
+
+  useEffect(() => {
+    api.get<Record<string, string | null>>('/settings/public-brand').then((data) => {
+      setContactVals({
+        contact_phone: data.contact_phone || defaults.contact_phone,
+        contact_whatsapp: data.contact_whatsapp || defaults.contact_whatsapp,
+        contact_address: data.contact_address || defaults.contact_address,
+        contact_hours: data.contact_hours || defaults.contact_hours,
+        contact_instagram: data.contact_instagram || defaults.contact_instagram,
+      });
+    }).catch(() => {});
+  }, []);
 
   const update = (field: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setForm(prev => ({ ...prev, [field]: e.target.value }));
@@ -69,11 +90,11 @@ export default function ContactPage() {
   };
 
   const infoCards = [
-    { label: dict.contact.phone, icon: '📞', value: '+963 11 234 5678' },
-    { label: dict.contact.whatsapp, icon: '💬', value: '+963 933 123 456' },
-    { label: dict.contact.address, icon: '📍', value: 'Damascus, Al-Mazzeh, Syria' },
-    { label: dict.contact.hours, icon: '🕒', value: 'Sat–Thu: 8:00 AM – 11:00 PM' },
-    { label: dict.contact.instagram, icon: '📷', value: '@banco.ricco' },
+    { label: dict.contact.phone, icon: '📞', value: contactVals.contact_phone },
+    { label: dict.contact.whatsapp, icon: '💬', value: contactVals.contact_whatsapp },
+    { label: dict.contact.address, icon: '📍', value: contactVals.contact_address },
+    { label: dict.contact.hours, icon: '🕒', value: contactVals.contact_hours },
+    { label: dict.contact.instagram, icon: '📷', value: contactVals.contact_instagram },
   ];
 
   return (
@@ -230,7 +251,7 @@ export default function ContactPage() {
               <EspressoButton size="large" onClick={() => router.push(`/${locale}/products`)}>
                 {dict.contact.ctaOrder}
               </EspressoButton>
-              <EspressoButton tone="outline" size="large" onClick={() => window.open('https://wa.me/963933123456', '_blank')}>
+              <EspressoButton tone="outline" size="large" onClick={() => window.open(`https://wa.me/${contactVals.contact_whatsapp.replace(/[^0-9]/g, '')}`, '_blank')}>
                 {dict.contact.ctaWhatsapp}
               </EspressoButton>
             </div>

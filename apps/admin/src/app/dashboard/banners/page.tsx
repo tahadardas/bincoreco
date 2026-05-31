@@ -1,7 +1,8 @@
 'use client';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { adminFetch, adminUpload } from '@/lib/api';
+import { adminFetch } from '@/lib/api';
 import { resolveMediaUrl } from '@/lib/media';
+import MediaUpload from '@/components/media-upload';
 
 interface BannerTranslation {
   locale: 'ar' | 'en';
@@ -73,6 +74,25 @@ const emptyForm: BannerForm = {
   subtitleEn: '',
 };
 
+const animationTypeOptions = [
+  { value: 'fade', label: 'Fade' },
+  { value: 'slideLeft', label: 'Slide Left' },
+  { value: 'slideRight', label: 'Slide Right' },
+  { value: 'slideUp', label: 'Slide Up' },
+  { value: 'slideDown', label: 'Slide Down' },
+  { value: 'zoomIn', label: 'Zoom In' },
+  { value: 'parallax', label: 'Parallax' },
+  { value: 'none', label: 'None' },
+];
+
+const displayModeOptions = [
+  { value: 'fullWidthHero', label: 'Full Width Hero' },
+  { value: 'contained', label: 'Contained' },
+  { value: 'card', label: 'Card' },
+  { value: 'splitImageText', label: 'Split Image/Text' },
+  { value: 'backgroundWithOverlay', label: 'Background with Overlay' },
+];
+
 function translation(banner: Banner, locale: 'ar' | 'en') {
   return banner.translations.find(item => item.locale === locale);
 }
@@ -83,11 +103,12 @@ export default function BannersPage() {
   const [saving, setSaving] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<BannerForm>(emptyForm);
-  const [uploading, setUploading] = useState(false);
+
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'hidden'>('all');
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
 
   const filteredBanners = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -114,27 +135,13 @@ export default function BannersPage() {
     }
   }, []);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
 
   const resetForm = () => {
     setEditId(null);
     setForm(emptyForm);
     setError(null);
-  };
-
-  const handleUpload = async (file: File) => {
-    setError(null);
-    setUploading(true);
-    try {
-      const result = await adminUpload(file, 'banners');
-      setForm(prev => ({ ...prev, imageUrl: result.url }));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'فشل رفع الصورة');
-    } finally {
-      setUploading(false);
-    }
+    setShowPreview(false);
   };
 
   const save = async () => {
@@ -207,6 +214,7 @@ export default function BannersPage() {
       subtitleEn: en?.subtitle || '',
     });
     setError(null);
+    setShowPreview(true);
   };
 
   const toggleActive = async (banner: Banner) => {
@@ -225,9 +233,7 @@ export default function BannersPage() {
     const title = translation(banner, 'ar')?.title || banner.imageUrl;
     setToast(title);
     setTimeout(() => setToast(null), 200);
-    if (!window.confirm(`تأكيد حذف البنر "${title}"؟`)) {
-      return;
-    }
+    if (!window.confirm(`تأكيد حذف البنر "${title}"؟`)) return;
     try {
       await adminFetch(`/admin/banners/${banner.id}`, { method: 'DELETE' });
       await load();
@@ -236,6 +242,10 @@ export default function BannersPage() {
     }
   };
 
+  const previewTitle = form.titleAr || form.titleEn;
+  const previewImg = resolveMediaUrl(form.imageUrl);
+  const previewMobileImg = resolveMediaUrl(form.mobileImageUrl || form.imageUrl);
+
   return (
     <div dir="rtl">
       <div style={{ marginBottom: 24 }}>
@@ -243,63 +253,97 @@ export default function BannersPage() {
         <p style={{ color: 'var(--br-muted)', fontSize: 14 }}>محتوى الواجهة الرئيسية والعروض البصرية المؤقتة.</p>
       </div>
 
-      {error && <div className="card" style={{ color: 'var(--br-danger)', marginBottom: 16 }}>{error}</div>}
+      {error && <div className="card" style={{ color: 'var(--br-danger)', marginBottom: 16, padding: 16 }}>{error}</div>}
 
-      <div className="card" style={{ marginBottom: 24 }}>
+      <div className="card" style={{ marginBottom: 24, padding: 20 }}>
         <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>{editId ? 'تعديل بنر' : 'إضافة بنر'}</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 16 }}>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16, marginBottom: 16 }}>
           <div>
             <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 6 }}>صورة سطح المكتب (يفضل 1920×720)</div>
-            <label className="btn btn-primary" style={{ display: 'inline-flex', cursor: 'pointer', fontSize: 13 }}>
-              {uploading ? 'جاري الرفع...' : (form.imageUrl ? 'تغيير الصورة' : 'تحميل صورة')}
-              <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={async event => { const file = event.target.files?.[0]; if (file) await handleUpload(file); event.target.value = ''; }} />
-            </label>
+            <MediaUpload folder="banners" onUploaded={url => setForm(prev => ({ ...prev, imageUrl: url }))} label={form.imageUrl ? 'تغيير الصورة' : 'تحميل صورة'} />
             {form.imageUrl && (
               <div style={{ marginTop: 8 }}>
-                <img src={resolveMediaUrl(form.imageUrl) || ''} alt="preview" style={{ width: '100%', maxHeight: 120, objectFit: 'cover', borderRadius: 6 }} />
+                <img src={previewImg || ''} alt="preview" style={{ width: '100%', maxHeight: 120, objectFit: 'cover', borderRadius: 6 }} />
               </div>
             )}
           </div>
           <div>
             <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 6 }}>صورة الجوال</div>
-            <input className="input" placeholder="رابط صورة الجوال" value={form.mobileImageUrl} onChange={event => setForm({ ...form, mobileImageUrl: event.target.value })} />
+            <MediaUpload folder="banners" onUploaded={url => setForm(prev => ({ ...prev, mobileImageUrl: url }))} label={form.mobileImageUrl ? 'تغيير الصورة' : 'تحميل صورة'} />
+            {form.mobileImageUrl && (
+              <div style={{ marginTop: 8 }}>
+                <img src={previewMobileImg || ''} alt="mobile preview" style={{ width: '100%', maxHeight: 120, objectFit: 'cover', borderRadius: 6 }} />
+              </div>
+            )}
+            <div style={{ marginTop: 4 }}>
+              <input className="input" placeholder="رابط صورة الجوال (خيار متقدم)" value={form.mobileImageUrl} onChange={event => setForm({ ...form, mobileImageUrl: event.target.value })} style={{ fontSize: 12, padding: '6px 10px' }} />
+            </div>
           </div>
-          <input className="input" placeholder="رابط الرابط" value={form.linkUrl} onChange={event => setForm({ ...form, linkUrl: event.target.value })} />
+          <input className="input" placeholder="رابط البنر" value={form.linkUrl} onChange={event => setForm({ ...form, linkUrl: event.target.value })} />
           <input className="input" placeholder="نص CTA (عربي)" value={form.ctaTextAr} onChange={event => setForm({ ...form, ctaTextAr: event.target.value })} />
           <input className="input" placeholder="CTA text (EN)" value={form.ctaTextEn} onChange={event => setForm({ ...form, ctaTextEn: event.target.value })} />
           <input className="input" placeholder="رابط CTA" value={form.ctaUrl} onChange={event => setForm({ ...form, ctaUrl: event.target.value })} />
         </div>
+
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 16 }}>
-          <select className="input" value={form.animationType} onChange={event => setForm({ ...form, animationType: event.target.value })}>
-            <option value="fade">Fade</option>
-            <option value="slide">Slide</option>
-            <option value="zoom">Zoom</option>
-          </select>
-          <select className="input" value={form.displayMode} onChange={event => setForm({ ...form, displayMode: event.target.value })}>
-            <option value="fullWidthHero">Full Width Hero</option>
-            <option value="contained">Contained</option>
-            <option value="split">Split</option>
-          </select>
-          <input className="input" type="number" step="0.05" min="0" max="1" placeholder="عتامة التغطية" value={form.overlayOpacity} onChange={event => setForm({ ...form, overlayOpacity: Number(event.target.value) || 0.35 })} />
-          <select className="input" value={form.textPosition} onChange={event => setForm({ ...form, textPosition: event.target.value })}>
-            <option value="center">وسط</option>
-            <option value="left">يسار</option>
-            <option value="right">يمين</option>
-            <option value="bottom">أسفل</option>
-          </select>
-          <select className="input" value={form.textColor} onChange={event => setForm({ ...form, textColor: event.target.value })}>
-            <option value="light">فاتح</option>
-            <option value="dark">داكن</option>
-          </select>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, fontSize: 14 }}>
-            <input type="checkbox" checked={form.isActive} onChange={event => setForm({ ...form, isActive: event.target.checked })} />
-            نشط
-          </label>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>نوع الحركة</div>
+            <select className="input" value={form.animationType} onChange={event => setForm({ ...form, animationType: event.target.value })}>
+              {animationTypeOptions.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>نمط العرض</div>
+            <select className="input" value={form.displayMode} onChange={event => setForm({ ...form, displayMode: event.target.value })}>
+              {displayModeOptions.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>عتامة التغطية</div>
+            <input className="input" type="number" step="0.05" min="0" max="1" placeholder="0.35" value={form.overlayOpacity} onChange={event => setForm({ ...form, overlayOpacity: Number(event.target.value) || 0.35 })} />
+          </div>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>موضع النص</div>
+            <select className="input" value={form.textPosition} onChange={event => setForm({ ...form, textPosition: event.target.value })}>
+              <option value="center">وسط</option>
+              <option value="left">يسار</option>
+              <option value="right">يمين</option>
+              <option value="bottom">أسفل</option>
+            </select>
+          </div>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>لون النص</div>
+            <select className="input" value={form.textColor} onChange={event => setForm({ ...form, textColor: event.target.value })}>
+              <option value="light">فاتح</option>
+              <option value="dark">داكن</option>
+            </select>
+          </div>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>الترتيب</div>
+            <input className="input" type="number" placeholder="0" value={form.sortOrder} onChange={event => setForm({ ...form, sortOrder: Number(event.target.value) || 0 })} />
+          </div>
         </div>
+
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 16 }}>
-          <input className="input" type="datetime-local" placeholder="يبدأ من" value={form.startsAt} onChange={event => setForm({ ...form, startsAt: event.target.value })} />
-          <input className="input" type="datetime-local" placeholder="ينتهي في" value={form.endsAt} onChange={event => setForm({ ...form, endsAt: event.target.value })} />
-          <input className="input" type="number" placeholder="الترتيب" value={form.sortOrder} onChange={event => setForm({ ...form, sortOrder: Number(event.target.value) || 0 })} />
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>يبدأ من</div>
+            <input className="input" type="datetime-local" value={form.startsAt} onChange={event => setForm({ ...form, startsAt: event.target.value })} />
+          </div>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>ينتهي في</div>
+            <input className="input" type="datetime-local" value={form.endsAt} onChange={event => setForm({ ...form, endsAt: event.target.value })} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, fontSize: 14, padding: '11px 0' }}>
+              <input type="checkbox" checked={form.isActive} onChange={event => setForm({ ...form, isActive: event.target.checked })} />
+              نشط
+            </label>
+          </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(240px, 1fr))', gap: 16, marginBottom: 16 }}>
@@ -315,13 +359,78 @@ export default function BannersPage() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button onClick={save} disabled={saving} className="btn btn-primary">{saving ? 'جاري الحفظ...' : editId ? 'حفظ' : 'إضافة'}</button>
           {editId && <button onClick={resetForm} className="btn" style={{ background: 'var(--br-cream)' }}>إلغاء</button>}
+          {(form.imageUrl || previewTitle) && (
+            <button onClick={() => setShowPreview(!showPreview)} className="btn" style={{ background: 'var(--br-espresso)', color: 'var(--br-gold-light)' }}>
+              {showPreview ? 'إخفاء المعاينة' : 'معاينة البنر'}
+            </button>
+          )}
         </div>
+
+        {showPreview && (form.imageUrl || previewTitle) && (
+          <div style={{ marginTop: 20, borderRadius: 12, overflow: 'hidden', border: '1px solid var(--br-line)' }}>
+            <div style={{ fontWeight: 700, fontSize: 14, padding: '8px 14px', background: 'var(--br-cream)', borderBottom: '1px solid var(--br-line)' }}>
+              معاينة البنر
+            </div>
+            <div
+              style={{
+                position: 'relative',
+                width: '100%',
+                height: 320,
+                background: form.imageUrl ? `url(${previewImg}) center/cover no-repeat` : 'var(--br-espresso)',
+                display: 'flex',
+                alignItems: form.textPosition === 'bottom' ? 'flex-end' : form.textPosition === 'center' ? 'center' : form.textPosition === 'left' ? 'flex-start' : 'flex-start',
+                justifyContent: 'center',
+              }}
+            >
+              {form.imageUrl && (
+                <div style={{ position: 'absolute', inset: 0, background: `rgba(0,0,0,${form.overlayOpacity || 0.35})`, zIndex: 1 }} />
+              )}
+              <div style={{
+                position: 'relative', zIndex: 2, padding: 32, textAlign: 'center',
+                color: form.textColor === 'dark' ? '#000' : '#fff',
+                direction: 'rtl',
+              }}>
+                {previewTitle && (
+                  <h2 style={{ fontSize: 28, fontWeight: 900, marginBottom: 8, textShadow: form.textColor === 'dark' ? 'none' : '0 2px 10px rgba(0,0,0,0.3)', color: form.textColor === 'dark' ? '#000' : 'var(--br-gold-light)' }}>
+                    {previewTitle}
+                  </h2>
+                )}
+                {form.subtitleAr && (
+                  <p style={{ fontSize: 15, opacity: 0.85, maxWidth: 500, margin: '0 auto' }}>
+                    {form.subtitleAr}
+                  </p>
+                )}
+                {(form.ctaTextAr || form.ctaTextEn) && (
+                  <div style={{ marginTop: 16 }}>
+                    <span style={{
+                      display: 'inline-block',
+                      padding: '10px 24px',
+                      borderRadius: 999,
+                      background: 'var(--br-gold)',
+                      color: '#000',
+                      fontWeight: 700,
+                      fontSize: 14,
+                    }}>
+                      {form.ctaTextAr || form.ctaTextEn}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div style={{ padding: '8px 14px', display: 'flex', gap: 12, fontSize: 12, color: 'var(--br-muted)', borderTop: '1px solid var(--br-line)' }}>
+              <span>الحركة: {form.animationType}</span>
+              <span>العتامة: {form.overlayOpacity}</span>
+              <span>موضع النص: {form.textPosition}</span>
+              <span>لون النص: {form.textColor}</span>
+            </div>
+          </div>
+        )}
       </div>
 
-      <div className="card" style={{ marginBottom: 20 }}>
+      <div className="card" style={{ marginBottom: 20, padding: 16 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 1fr) 180px', gap: 12 }}>
           <input className="input" placeholder="بحث بالعنوان أو رابط الصورة" value={search} onChange={event => setSearch(event.target.value)} />
           <select className="input" value={statusFilter} onChange={event => setStatusFilter(event.target.value as 'all' | 'active' | 'hidden')}>

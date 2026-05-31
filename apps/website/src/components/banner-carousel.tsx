@@ -1,7 +1,8 @@
 'use client';
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { api } from '@/lib/api';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { resolveMediaUrl } from '@/lib/media';
+import EspressoButton from '@/components/espresso-button';
+import Link from 'next/link';
 
 interface BannerTranslation {
   locale: string;
@@ -14,145 +15,455 @@ interface Banner {
   imageUrl: string;
   mobileImageUrl?: string | null;
   linkUrl?: string | null;
+  ctaTextAr?: string | null;
+  ctaTextEn?: string | null;
+  ctaUrl?: string | null;
+  animationType?: string;
+  displayMode?: string;
+  overlayOpacity?: number;
+  textPosition?: string;
+  textColor?: string;
   sortOrder: number;
   translations: BannerTranslation[];
 }
 
 type BannerCarouselProps = {
+  banners: Banner[];
   locale: string;
   autoplayMs?: number;
+  className?: string;
 };
 
-export default function BannerCarousel({ locale, autoplayMs = 5000 }: BannerCarouselProps) {
-  const [banners, setBanners] = useState<Banner[]>([]);
+const ANIM_DURATION = 500;
+
+const isRtlLocale = (locale: string) => locale === 'ar' || locale === 'fa' || locale === 'he';
+
+function getTranslateX(fromLeft: boolean, isRtl: boolean): string {
+  if (fromLeft) return isRtl ? '100%' : '-100%';
+  return isRtl ? '-100%' : '100%';
+}
+
+function getEnterKeyframes(type: string, isRtl: boolean): string {
+  switch (type) {
+    case 'slideLeft': {
+      const x = getTranslateX(false, isRtl);
+      return `translateX(${x})`;
+    }
+    case 'slideRight': {
+      const x = getTranslateX(true, isRtl);
+      return `translateX(${x})`;
+    }
+    case 'slideUp': return 'translateY(4rem)';
+    case 'slideDown': return 'translateY(-4rem)';
+    case 'zoomIn': return 'scale(0.85)';
+    case 'parallax': return 'translateY(2rem)';
+    case 'none': return '';
+    default: return getTranslateX(false, isRtl);
+  }
+}
+
+function getExitKeyframes(type: string, isRtl: boolean): string {
+  switch (type) {
+    case 'slideLeft': {
+      const x = getTranslateX(true, isRtl);
+      return `translateX(${x})`;
+    }
+    case 'slideRight': {
+      const x = getTranslateX(false, isRtl);
+      return `translateX(${x})`;
+    }
+    case 'slideUp': return 'translateY(-4rem)';
+    case 'slideDown': return 'translateY(4rem)';
+    case 'zoomIn': return 'scale(1.05)';
+    case 'parallax': return 'translateY(-2rem)';
+    case 'none': return '';
+    default: return getTranslateX(true, isRtl);
+  }
+}
+
+export default function BannerCarousel({
+  banners,
+  locale,
+  autoplayMs = 5000,
+  className = '',
+}: BannerCarouselProps) {
+  const isRtl = isRtlLocale(locale);
   const [current, setCurrent] = useState(0);
-  const [loading, setLoading] = useState(true);
   const [direction, setDirection] = useState<'next' | 'prev'>('next');
+  const [exitingIndex, setExitingIndex] = useState<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const touchStart = useRef(0);
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
 
   useEffect(() => {
-    api.get<Banner[]>('/banners')
-      .then(setBanners)
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setPrefersReducedMotion(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setPrefersReducedMotion(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
   }, []);
 
+  const totalSlides = banners.length;
+
+  const safeIndex = useCallback((index: number) => {
+    if (totalSlides === 0) return 0;
+    return ((index % totalSlides) + totalSlides) % totalSlides;
+  }, [totalSlides]);
+
   const goTo = useCallback((index: number) => {
-    setDirection(index > current ? 'next' : 'prev');
+    if (totalSlides < 2 || index === current) return;
+    setDirection(index > current || (current === totalSlides - 1 && index === 0) ? 'next' : 'prev');
+    setExitingIndex(current);
     setCurrent(index);
-  }, [current]);
+  }, [current, totalSlides]);
 
   const next = useCallback(() => {
-    if (banners.length < 2) return;
-    setDirection('next');
-    setCurrent(prev => (prev + 1) % banners.length);
-  }, [banners.length]);
+    if (totalSlides < 2) return;
+    goTo(safeIndex(current + 1));
+  }, [totalSlides, current, goTo, safeIndex]);
 
   const prev = useCallback(() => {
-    if (banners.length < 2) return;
-    setDirection('prev');
-    setCurrent(prev => (prev - 1 + banners.length) % banners.length);
-  }, [banners.length]);
+    if (totalSlides < 2) return;
+    goTo(safeIndex(current - 1));
+  }, [totalSlides, current, goTo, safeIndex]);
+
+  const startAutoplay = useCallback(() => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (totalSlides >= 2) {
+      timerRef.current = setInterval(next, autoplayMs);
+    }
+  }, [totalSlides, autoplayMs, next]);
+
+  const stopAutoplay = useCallback(() => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
-    if (banners.length < 2) return;
-    timerRef.current = setInterval(next, autoplayMs);
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [banners.length, autoplayMs, next]);
+    startAutoplay();
+    return stopAutoplay;
+  }, [startAutoplay, stopAutoplay]);
 
-  const pause = () => {
-    if (timerRef.current) clearInterval(timerRef.current);
-  };
-  const resume = () => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    if (banners.length >= 2) timerRef.current = setInterval(next, autoplayMs);
-  };
+  useEffect(() => {
+    return () => stopAutoplay();
+  }, [stopAutoplay]);
 
-  const onTouchStart = (e: React.TouchEvent) => { touchStart.current = e.touches[0].clientX; };
-  const onTouchEnd = (e: React.TouchEvent) => {
-    const diff = touchStart.current - e.changedTouches[0].clientX;
-    if (Math.abs(diff) > 50) diff > 0 ? next() : prev();
-  };
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowLeft') {
+      isRtl ? next() : prev();
+    } else if (e.key === 'ArrowRight') {
+      isRtl ? prev() : next();
+    }
+  }, [isRtl, next, prev]);
 
-  if (loading) return <div style={{ height: 340, background: 'var(--br-espresso)', borderRadius: 16 }} />;
-  if (banners.length === 0) return null;
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  }, []);
 
-  const t = (banner: Banner) => banner.translations.find(tr => tr.locale === locale) || banner.translations[0];
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    const dx = touchStartX.current - e.changedTouches[0].clientX;
+    const dy = Math.abs(touchStartY.current - e.changedTouches[0].clientY);
+    if (Math.abs(dx) > 50 && dy < Math.abs(dx) * 0.6) {
+      if (dx > 0) isRtl ? prev() : next();
+      else isRtl ? next() : prev();
+    }
+  }, [isRtl, next, prev]);
+
+  const handleImageError = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+    e.currentTarget.style.display = 'none';
+  }, []);
+
+  const getAnimStyle = useCallback((isEntering: boolean, animType?: string) => {
+    if (prefersReducedMotion) return {};
+    const type = animType || banners[current]?.animationType || 'fade';
+    if (isEntering) {
+      const transform = getEnterKeyframes(type, isRtl);
+      return {
+        transform: transform || undefined,
+        opacity: type !== 'none' ? 0 : undefined,
+      };
+    }
+    const transform = getExitKeyframes(type, isRtl);
+    return {
+      transform: transform || undefined,
+      opacity: type !== 'none' ? 0 : undefined,
+    };
+  }, [banners, current, isRtl, prefersReducedMotion]);
+
+  if (!banners || banners.length === 0) return null;
+
   const currentBanner = banners[current];
+  const t = (banner: Banner) => banner.translations?.find(tr => tr.locale === locale) || banner.translations?.[0];
+  const trans = t(currentBanner);
+  const isRtlDoc = isRtl;
+
+  const isDarkText = currentBanner.textColor === 'dark';
+  const overlayOpacity = currentBanner.overlayOpacity ?? 0.35;
+  const textColorCSS = isDarkText ? 'var(--br-black)' : 'var(--br-white)';
+  const textShadowCSS = isDarkText ? 'none' : '0 2px 20px rgba(0,0,0,0.35)';
+  const textPosition = currentBanner.textPosition || 'center';
+
+  const contentAlign = textPosition === 'left' ? 'flex-start'
+    : textPosition === 'right' ? 'flex-end'
+    : textPosition === 'bottom' ? 'flex-end'
+    : 'center';
+
+  const contentJustify = textPosition === 'bottom' ? 'flex-end'
+    : textPosition === 'center' ? 'center'
+    : 'center';
+
+  const imageUrl = resolveMediaUrl(currentBanner.imageUrl);
+  const mobileImageUrl = resolveMediaUrl(currentBanner.mobileImageUrl || currentBanner.imageUrl);
+
+  const hasCta = currentBanner.ctaUrl && (currentBanner.ctaTextAr || currentBanner.ctaTextEn);
+  const ctaText = isRtl ? currentBanner.ctaTextAr : currentBanner.ctaTextEn;
+  const ctaUrl = currentBanner.ctaUrl;
+
+  const slideContent = (
+    <div className="banner-carousel__slide-inner">
+      <picture className="banner-carousel__media">
+        <source media="(max-width: 640px)" srcSet={mobileImageUrl || ''} />
+        <img
+          src={imageUrl || ''}
+          alt={trans?.title || ''}
+          onError={handleImageError}
+          className="banner-carousel__img"
+          loading="eager"
+        />
+      </picture>
+      {!imageUrl && (
+        <div className="banner-carousel__fallback">
+          <div className="banner-carousel__fallback-icon">BR</div>
+        </div>
+      )}
+      <div
+        className="banner-carousel__overlay"
+        style={{ opacity: overlayOpacity }}
+      />
+      {(trans?.title || trans?.subtitle || hasCta) && (
+        <div
+          className="banner-carousel__content"
+          style={{
+            alignItems: contentAlign,
+            justifyContent: contentJustify,
+            textAlign: textPosition === 'left' ? 'start' : textPosition === 'right' ? 'end' : 'center',
+          }}
+        >
+          <div className="banner-carousel__text-box">
+            {trans?.title && (
+              <h2
+                className="banner-carousel__title"
+                style={{
+                  color: textColorCSS,
+                  textShadow: textShadowCSS,
+                }}
+              >
+                {trans.title}
+              </h2>
+            )}
+            {trans?.subtitle && (
+              <p
+                className="banner-carousel__subtitle"
+                style={{
+                  color: isDarkText ? 'rgba(0,0,0,0.7)' : 'rgba(255,250,240,0.85)',
+                  textShadow: textShadowCSS,
+                }}
+              >
+                {trans.subtitle}
+              </p>
+            )}
+            {hasCta && (
+              <div className="banner-carousel__cta">
+                {ctaUrl?.startsWith('/') || ctaUrl?.startsWith('http') ? (
+                  <Link href={ctaUrl} target={ctaUrl.startsWith('http') ? '_blank' : undefined} rel={ctaUrl.startsWith('http') ? 'noopener noreferrer' : undefined}>
+                    <EspressoButton size="medium">{ctaText}</EspressoButton>
+                  </Link>
+                ) : (
+                  <EspressoButton size="medium" onClick={() => {}}>{ctaText}</EspressoButton>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div
-      className="carousel"
-      onMouseEnter={pause}
-      onMouseLeave={resume}
-      onTouchStart={onTouchStart}
-      onTouchEnd={onTouchEnd}
-      style={{ position: 'relative', overflow: 'hidden', borderRadius: 16, height: 340, background: 'var(--br-espresso)' }}
+      className={`banner-carousel ${className}`}
+      dir={isRtlDoc ? 'rtl' : 'ltr'}
+      onMouseEnter={stopAutoplay}
+      onMouseLeave={startAutoplay}
+      onKeyDown={handleKeyDown}
+      tabIndex={0}
+      role="region"
+      aria-label={isRtlDoc ? 'عرض البنرات' : 'Banner carousel'}
+      aria-roledescription="carousel"
     >
-      {banners.map((banner, i) => (
+      <div
+        className="banner-carousel__viewport"
+        ref={viewportRef}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
+        {exitingIndex !== null && exitingIndex !== current && (
+          <div
+            key={`exit-${exitingIndex}`}
+            className="banner-carousel__slide banner-carousel__slide--exit"
+            style={{
+              ...(!prefersReducedMotion ? {
+                transition: `transform ${ANIM_DURATION}ms cubic-bezier(0.16, 1, 0.3, 1), opacity ${ANIM_DURATION}ms cubic-bezier(0.16, 1, 0.3, 1)`,
+              } : {}),
+              ...getAnimStyle(false, banners[exitingIndex]?.animationType),
+            }}
+            onTransitionEnd={() => setExitingIndex(null)}
+          >
+            {banners[exitingIndex] && (
+              <BannerSlideContent
+                banner={banners[exitingIndex]}
+                locale={locale}
+                isRtl={isRtlDoc}
+                handleImageError={handleImageError}
+              />
+            )}
+          </div>
+        )}
         <div
-          key={banner.id}
+          key={`enter-${current}`}
+          className="banner-carousel__slide banner-carousel__slide--active"
           style={{
-            position: 'absolute', inset: 0,
-            transition: 'all 0.6s cubic-bezier(0.16, 1, 0.3, 1)',
-            opacity: i === current ? 1 : 0,
-            transform: i === current ? 'translateX(0)' : `translateX(${i < current ? '-100%' : '100%'})`,
-            pointerEvents: i === current ? 'auto' : 'none',
+            ...(!prefersReducedMotion ? {
+              animation: `banner-enter ${ANIM_DURATION}ms cubic-bezier(0.16, 1, 0.3, 1) forwards`,
+            } : {}),
+            ...(prefersReducedMotion ? getAnimStyle(true, banners[current]?.animationType) : {}),
           }}
         >
-          <picture>
-            <source
-              media="(max-width: 640px)"
-              srcSet={resolveMediaUrl(banner.mobileImageUrl || banner.imageUrl) || ''}
-            />
-            <img
-              src={resolveMediaUrl(banner.imageUrl) || ''}
-              alt=""
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-            />
-          </picture>
-          {(t(banner)?.title || t(banner)?.subtitle) && (
-            <div style={{
-              position: 'absolute', inset: 0,
-              background: 'linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 60%)',
-              display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
-              padding: 32,
-            }}>
-              {t(banner)?.title && <h2 style={{ color: '#fff', fontSize: 28, fontWeight: 900 }}>{t(banner)!.title}</h2>}
-              {t(banner)?.subtitle && <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: 16 }}>{t(banner)!.subtitle}</p>}
-            </div>
-          )}
+          {slideContent}
         </div>
-      ))}
+      </div>
 
-      {banners.length > 1 && (
+      {totalSlides > 1 && (
         <>
-          <div style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 8 }}>
-            {banners.map((_, i) => (
+          <button
+            className="banner-carousel__arrow banner-carousel__arrow--prev"
+            onClick={prev}
+            aria-label={isRtlDoc ? 'التالي' : 'Previous'}
+          >
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <path d="M12 4L6 10L12 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+          <button
+            className="banner-carousel__arrow banner-carousel__arrow--next"
+            onClick={next}
+            aria-label={isRtlDoc ? 'السابق' : 'Next'}
+          >
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <path d="M8 4L14 10L8 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+          <div className="banner-carousel__dots" role="tablist" aria-label={isRtlDoc ? 'اختيار بنر' : 'Select banner'}>
+            {banners.map((banner, i) => (
               <button
-                key={i}
+                key={banner.id}
+                className={`banner-carousel__dot ${i === current ? 'banner-carousel__dot--active' : ''}`}
                 onClick={() => goTo(i)}
-                style={{
-                  width: i === current ? 24 : 8, height: 8, borderRadius: 4, border: 'none',
-                  background: i === current ? 'var(--br-gold)' : 'rgba(255,255,255,0.4)',
-                  cursor: 'pointer', transition: 'all 0.3s',
-                }}
-                aria-label={`Slide ${i + 1}`}
+                role="tab"
+                aria-selected={i === current}
+                aria-label={isRtlDoc ? `البنر ${i + 1}` : `Banner ${i + 1}`}
               />
             ))}
           </div>
-          <button
-            onClick={prev}
-            style={{ position: 'absolute', top: '50%', right: 12, transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.4)', color: '#fff', border: 'none', borderRadius: '50%', width: 40, height: 40, fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            aria-label="Previous"
-          >‹</button>
-          <button
-            onClick={next}
-            style={{ position: 'absolute', top: '50%', left: 12, transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.4)', color: '#fff', border: 'none', borderRadius: '50%', width: 40, height: 40, fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            aria-label="Next"
-          >›</button>
         </>
+      )}
+    </div>
+  );
+}
+
+function BannerSlideContent({
+  banner,
+  locale,
+  isRtl,
+  handleImageError,
+}: {
+  banner: Banner;
+  locale: string;
+  isRtl: boolean;
+  handleImageError: (e: React.SyntheticEvent<HTMLImageElement>) => void;
+}) {
+  const isDarkText = banner.textColor === 'dark';
+  const t = banner.translations?.find(tr => tr.locale === locale) || banner.translations?.[0];
+  const imgUrl = resolveMediaUrl(banner.imageUrl);
+  const mobileImgUrl = resolveMediaUrl(banner.mobileImageUrl || banner.imageUrl);
+  const overlayOpacity = banner.overlayOpacity ?? 0.35;
+  const textColorCSS = isDarkText ? 'var(--br-black)' : 'var(--br-white)';
+  const textShadowCSS = isDarkText ? 'none' : '0 2px 20px rgba(0,0,0,0.35)';
+  const textPosition = banner.textPosition || 'center';
+  const contentAlign = textPosition === 'left' ? 'flex-start'
+    : textPosition === 'right' ? 'flex-end'
+    : textPosition === 'bottom' ? 'flex-end'
+    : 'center';
+  const contentJustify = textPosition === 'bottom' ? 'flex-end' : 'center';
+  const hasCta = banner.ctaUrl && (banner.ctaTextAr || banner.ctaTextEn);
+  const ctaText = isRtl ? banner.ctaTextAr : banner.ctaTextEn;
+  const ctaUrl = banner.ctaUrl;
+
+  return (
+    <div className="banner-carousel__slide-inner">
+      <picture className="banner-carousel__media">
+        <source media="(max-width: 640px)" srcSet={mobileImgUrl || ''} />
+        <img
+          src={imgUrl || ''}
+          alt={t?.title || ''}
+          onError={handleImageError}
+          className="banner-carousel__img"
+          loading="eager"
+        />
+      </picture>
+      {!imgUrl && (
+        <div className="banner-carousel__fallback">
+          <div className="banner-carousel__fallback-icon">BR</div>
+        </div>
+      )}
+      <div
+        className="banner-carousel__overlay"
+        style={{ opacity: overlayOpacity }}
+      />
+      {(t?.title || t?.subtitle || hasCta) && (
+        <div
+          className="banner-carousel__content"
+          style={{
+            alignItems: contentAlign,
+            justifyContent: contentJustify,
+            textAlign: textPosition === 'left' ? 'start' : textPosition === 'right' ? 'end' : 'center',
+          }}
+        >
+          <div className="banner-carousel__text-box">
+            {t?.title && (
+              <h2 className="banner-carousel__title" style={{ color: textColorCSS, textShadow: textShadowCSS }}>{t.title}</h2>
+            )}
+            {t?.subtitle && (
+              <p className="banner-carousel__subtitle" style={{ color: isDarkText ? 'rgba(0,0,0,0.7)' : 'rgba(255,250,240,0.85)', textShadow: textShadowCSS }}>{t.subtitle}</p>
+            )}
+            {hasCta && ctaUrl && (
+              <div className="banner-carousel__cta">
+                {ctaUrl.startsWith('/') || ctaUrl.startsWith('http') ? (
+                  <Link href={ctaUrl} target={ctaUrl.startsWith('http') ? '_blank' : undefined} rel={ctaUrl.startsWith('http') ? 'noopener noreferrer' : undefined}>
+                    <EspressoButton size="medium">{ctaText}</EspressoButton>
+                  </Link>
+                ) : (
+                  <EspressoButton size="medium">{ctaText}</EspressoButton>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

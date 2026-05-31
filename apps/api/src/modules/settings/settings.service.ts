@@ -43,4 +43,45 @@ export class SettingsService {
     }
     return result;
   }
+
+  async getPublicBrandSettings(): Promise<Record<string, string | null>> {
+    const allowedKeys = [
+      'brand_logo_main',
+      'brand_logo_dark',
+      'brand_logo_light',
+      'brand_mark',
+      'brand_favicon',
+      'brand_fallback_image',
+      'brand_pattern',
+      'brand_footer_logo',
+      'contact_phone',
+      'contact_whatsapp',
+      'contact_address',
+      'contact_hours',
+      'contact_instagram',
+      'contact_email',
+    ];
+    const keys = await this.prisma.setting.findMany({
+      where: { key: { in: allowedKeys } },
+    });
+    const result: Record<string, string | null> = {};
+    for (const key of allowedKeys) {
+      const found = keys.find(s => s.key === key);
+      result[key] = found?.value ?? null;
+    }
+    return result;
+  }
+
+  async remove(key: string, auditContext?: AuditLogContext) {
+    const before = await this.prisma.setting.findUnique({ where: { key } });
+    await this.prisma.setting.delete({ where: { key } }).catch(() => {});
+    await this.auditLogs.record({
+      ...auditContext,
+      action: AuditActions.SETTING_CHANGED,
+      entityType: 'Setting',
+      entityId: key,
+      beforeSnapshot: before,
+      afterSnapshot: null,
+    });
+  }
 }

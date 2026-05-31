@@ -1,20 +1,32 @@
 import { ReactNode } from 'react';
 import { AuthProvider } from '@/lib/auth-context';
+import { BrandProvider } from '@/lib/brand-context';
 import Header from '@/components/header';
+import { getPublicBrandSettings, resolveBrandAsset } from '@/lib/brand-settings';
+import { resolveMediaUrl } from '@/lib/media';
 
-export default function LocaleLayout({ children, params }: { children: ReactNode; params: { locale: string } }) {
+export default async function LocaleLayout({ children, params }: { children: ReactNode; params: { locale: string } }) {
   const dir = params.locale === 'ar' ? 'rtl' : 'ltr';
   const lang = params.locale === 'ar' ? 'ar' : 'en';
+  const brand = await getPublicBrandSettings();
+
+  const markUrl = resolveBrandAsset(brand.brand_mark, '/brand/br-monogram.png');
+  const footerLogoUrl = resolveBrandAsset(brand.brand_footer_logo || brand.brand_mark, '/brand/br-monogram.png');
+  const patternUrl = resolveBrandAsset(brand.brand_pattern, '/brand/banco-arabesque-pattern.svg');
+  const faviconUrl = resolveMediaUrl(brand.brand_favicon) || '/favicon.ico';
 
   return (
     <html lang={lang} dir={dir}>
       <head>
         <title>Banco Ricco</title>
         <meta name="description" content="Banco Ricco - Premium Coffee Experience" />
+        <link rel="icon" href={faviconUrl} />
+        <style>{`:root { --br-brand-pattern-url: url("${patternUrl}"); }`}</style>
       </head>
       <body>
         <AuthProvider>
-          <Header />
+          <BrandProvider settings={brand}>
+          <Header brandMark={markUrl} />
           <main style={{ minHeight: 'calc(100vh - 80px)' }}>
             {children}
           </main>
@@ -27,7 +39,12 @@ export default function LocaleLayout({ children, params }: { children: ReactNode
           }}>
             <div className="container" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 32, marginBottom: 24 }}>
               <div>
-                <div style={{ fontWeight: 900, color: 'var(--br-gold)', marginBottom: 12 }}>Banco Ricco</div>
+                <div style={{ fontWeight: 900, color: 'var(--br-gold)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
+                  {footerLogoUrl && (
+                    <img src={footerLogoUrl} alt="Banco Ricco" style={{ width: 36, height: 36, objectFit: 'contain' }} />
+                  )}
+                  Banco Ricco
+                </div>
                 <p>{params.locale === 'ar' ? 'نحترم البن من المصدر حتى آخر رشفة.' : 'We respect the beans from source to last sip.'}</p>
               </div>
               <div>
@@ -52,6 +69,7 @@ export default function LocaleLayout({ children, params }: { children: ReactNode
               &copy; {new Date().getFullYear()} Banco Ricco · {params.locale === 'ar' ? 'نحترم البن' : 'We Respect the Beans'}
             </div>
           </footer>
+        </BrandProvider>
         </AuthProvider>
       </body>
     </html>

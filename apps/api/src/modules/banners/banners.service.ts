@@ -6,8 +6,15 @@ export class BannersService {
   constructor(private prisma: PrismaService) {}
 
   async findAll(locale?: string) {
+    const now = new Date();
     return this.prisma.banner.findMany({
-      where: { isActive: true },
+      where: {
+        isActive: true,
+        AND: [
+          { OR: [{ startsAt: null }, { startsAt: { lte: now } }] },
+          { OR: [{ endsAt: null }, { endsAt: { gte: now } }] },
+        ],
+      },
       include: {
         translations: locale ? { where: { locale } } : true,
       },

@@ -12,6 +12,7 @@ import CupSizeSelector from '@/components/cup-size-selector';
 import { getGuestSession } from '@/lib/guest-session';
 import { resolveMediaUrl } from '@/lib/media';
 import ProductReviews from '@/components/product-reviews';
+import { useBrand } from '@/lib/brand-context';
 
 interface Product {
   id: string;
@@ -81,6 +82,7 @@ export default function ProductDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
+  const brand = useBrand();
 
   const isCoffeeBean = product?.type === 'COFFEE_BEAN';
   const availableGrindOptions = product?.grindOptions
@@ -212,6 +214,10 @@ export default function ProductDetailPage() {
               ) : resolveMediaUrl(product.imageUrl) ? (
                 <div style={{ minHeight: 420, display: 'grid', placeItems: 'center', background: 'linear-gradient(135deg, rgba(27,16,11,0.94), rgba(75,46,30,0.84)), repeating-linear-gradient(45deg, rgba(201,150,26,0.13) 0 1px, transparent 1px 16px)' }}>
                   <img src={resolveMediaUrl(product.imageUrl)!} alt={translation.name} style={{ width: '100%', height: 420, objectFit: 'cover' }} />
+                </div>
+              ) : brand.resolvedFallbackImage ? (
+                <div style={{ minHeight: 420, display: 'grid', placeItems: 'center', background: 'var(--br-espresso)' }}>
+                  <img src={brand.resolvedFallbackImage} alt={translation.name} style={{ width: '100%', height: 420, objectFit: 'cover' }} />
                 </div>
               ) : (
                 <div className="premium-fallback" style={{ minHeight: 420 }}>

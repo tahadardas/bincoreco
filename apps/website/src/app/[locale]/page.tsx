@@ -6,12 +6,22 @@ import { getDictionary, Locale } from '@/lib/dictionaries';
 import AuthModal from '@/components/auth-modal';
 import EspressoButton from '@/components/espresso-button';
 import ProductCard, { ProductSummary } from '@/components/product-card';
+import BannerCarousel from '@/components/banner-carousel';
 import { RevealSection } from '@/components/scroll-reveal';
 
 interface Banner {
   id: string;
   imageUrl: string;
-  linkUrl: string | null;
+  mobileImageUrl?: string | null;
+  linkUrl?: string | null;
+  ctaTextAr?: string | null;
+  ctaTextEn?: string | null;
+  ctaUrl?: string | null;
+  animationType?: string;
+  displayMode?: string;
+  overlayOpacity?: number;
+  textPosition?: string;
+  textColor?: string;
   sortOrder: number;
   translations: { locale: string; title: string | null; subtitle: string | null }[];
 }
@@ -149,26 +159,9 @@ export default function HomePage() {
       </section>
 
       {banners.length > 0 && (
-        <section style={{ padding: '30px 0 0' }}>
-          <div className="container" style={{ display: 'grid', gap: 14 }}>
-            {banners.map(banner => {
-              const t = banner.translations.find(item => item.locale === locale);
-              return (
-                <div key={banner.id} className="card" style={{
-                  minHeight: 150,
-                  backgroundImage: `linear-gradient(90deg, rgba(11,10,8,0.86), rgba(27,16,11,0.42)), url(${banner.imageUrl})`,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
-                  color: 'var(--br-white)',
-                  padding: 26,
-                  display: 'grid',
-                  alignContent: 'center',
-                }}>
-                  <h2 style={{ color: 'var(--br-gold-light)', fontSize: 26, fontWeight: 900 }}>{t?.title}</h2>
-                  {t?.subtitle && <p style={{ marginTop: 6, maxWidth: 540 }}>{t.subtitle}</p>}
-                </div>
-              );
-            })}
+        <section className="banner-carousel-section">
+          <div className="container">
+            <BannerCarousel banners={banners} locale={locale} />
           </div>
         </section>
       )}

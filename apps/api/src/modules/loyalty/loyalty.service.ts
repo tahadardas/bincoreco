@@ -195,7 +195,11 @@ export class LoyaltyService {
     if (!qrCard || !qrCard.isActive) return null;
     return this.prisma.loyaltyAccount.findUnique({
       where: { customerId: qrCard.customerId },
-      include: { customer: true },
+      include: {
+        customer: {
+          include: { user: { select: { id: true, email: true, fullName: true } } },
+        },
+      },
     });
   }
 
@@ -290,6 +294,140 @@ export class LoyaltyService {
         account: updatedAccount,
         transaction,
       },
+    });
+
+    return transaction;
+  }
+
+  async adminSearch(query: string) {
+    const trimmed = query.trim();
+    if (!trimmed) return [];
+    const users = await this.prisma.user.findMany({
+      where: {
+        role: 'customer',
+        OR: [
+          { fullName: { contains: trimmed, mode: 'insensitive' } },
+          { phone: { contains: trimmed } },
+          { email: { contains: trimmed, mode: 'insensitive' } },
+        ],
+      },
+      select: { id: true, fullName: true, email: true, phone: true },
+    });
+    const qrCards = await this.prisma.qRCard.findMany({
+      where: { publicToken: { contains: trimmed } },
+      select: { customerId: true, publicToken: true },
+    });
+    const userIds = users.map(u => u.id);
+    const qrCustomerIds = qrCards.map(q => q.customerId);
+
+    const accounts = await this.prisma.loyaltyAccount.findMany({
+      where: {
+        OR: [
+          { customer: { userId: { in: userIds } } },
+          ...(qrCustomerIds.length > 0 ? [{ customerId: { in: qrCustomerIds } }] : []),
+        ],
+      },
+      include: {
+        customer: {
+          include: { user: { select: { id: true, email: true, fullName: true, phone: true } } },
+        },
+        transactions: { orderBy: { createdAt: 'desc' }, take: 5 },
+      },
+    });
+
+    const qrMap = new Map(qrCards.map(q => [q.customerId, q.publicToken]));
+    return accounts.map(a => ({
+      ...a,
+      qrToken: qrMap.get(a.customerId) || null,
+    }));
+  }
+
+  async adminRedeemPoints(
+    accountId: string,
+    points: number,
+    reason: string,
+    adminUserId: string,
+    orderId?: string,
+    auditContext?: AuditLogContext,
+  ) {
+    const account = await this.prisma.loyaltyAccount.findUnique({ where: { id: accountId } });
+    if (!account) throw new NotFoundException('Loyalty account not found');
+    if (account.balance < points) {
+      throw new BadRequestException(`Insufficient balance: ${account.balance} available, ${points} requested`);
+    }
+
+    const updatedAccount = await this.prisma.loyaltyAccount.update({
+      where: { id: accountId },
+      data: {
+        balance: { decrement: points },
+        lifetimeRedeemed: { increment: points },
+      },
+    });
+
+    const transaction = await this.prisma.loyaltyTransaction.create({
+      data: {
+        loyaltyAccountId: accountId,
+        type: 'REDEEM',
+        points: -points,
+        reason,
+        orderId,
+        createdBy: adminUserId,
+      },
+    });
+
+    await this.auditLogs.record({
+      ...auditContext,
+      actorUserId: adminUserId,
+      action: AuditActions.LOYALTY_POINTS_REDEEMED,
+      entityType: 'LoyaltyAccount',
+      entityId: accountId,
+      beforeSnapshot: { balance: account.balance },
+      afterSnapshot: { balance: updatedAccount.balance, transaction },
+    });
+
+    return transaction;
+  }
+
+  async adminRedeemStamps(
+    accountId: string,
+    stamps: number,
+    rewardName: string,
+    adminUserId: string,
+    orderId?: string,
+    auditContext?: AuditLogContext,
+  ) {
+    const account = await this.prisma.loyaltyAccount.findUnique({ where: { id: accountId } });
+    if (!account) throw new NotFoundException('Loyalty account not found');
+    if (account.stampCount < stamps) {
+      throw new BadRequestException(`Insufficient stamps: ${account.stampCount} available, ${stamps} requested`);
+    }
+
+    const updatedAccount = await this.prisma.loyaltyAccount.update({
+      where: { id: accountId },
+      data: {
+        stampCount: { decrement: stamps },
+      },
+    });
+
+    const transaction = await this.prisma.loyaltyTransaction.create({
+      data: {
+        loyaltyAccountId: accountId,
+        type: 'STAMP_REDEEM',
+        points: -stamps,
+        reason: `Redeemed ${stamps} stamps for ${rewardName}`,
+        orderId,
+        createdBy: adminUserId,
+      },
+    });
+
+    await this.auditLogs.record({
+      ...auditContext,
+      actorUserId: adminUserId,
+      action: AuditActions.LOYALTY_STAMPS_REDEEMED,
+      entityType: 'LoyaltyAccount',
+      entityId: accountId,
+      beforeSnapshot: { stampCount: account.stampCount },
+      afterSnapshot: { stampCount: updatedAccount.stampCount, transaction },
     });
 
     return transaction;

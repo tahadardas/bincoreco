@@ -1,4 +1,4 @@
-import { Controller, Get, Put, Param, Body, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Put, Delete, Param, Body, Req, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { z } from 'zod';
@@ -11,32 +11,57 @@ import { AuthenticatedRequest } from '../../common/auth/authenticated-request.ty
 import { getAuditContext } from '../../common/audit/audit-context';
 
 const updateSettingSchema = z.object({
-  value: z.string().min(1).max(1000),
+  value: z.string().max(1000).optional().default(''),
 });
 
 type UpdateSettingInput = z.infer<typeof updateSettingSchema>;
 
 @ApiTags('Settings')
-@Controller('admin/settings')
-@UseGuards(AuthGuard('jwt'), RolesGuard)
-@Roles('admin', 'maestro')
-@ApiBearerAuth()
+@Controller()
 export class SettingsController {
   constructor(private settingsService: SettingsService) {}
 
-  @Get()
+  @Get('settings/public-brand')
+  async getPublicBrand() {
+    const data = await this.settingsService.getPublicBrandSettings();
+    return successResponse(data);
+  }
+
+  @Get('admin/settings')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin', 'maestro')
+  @ApiBearerAuth()
   async getAll() {
     const data = await this.settingsService.getAll();
     return successResponse(data);
   }
 
-  @Put(':key')
+  @Put('admin/settings/:key')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin', 'maestro')
+  @ApiBearerAuth()
   async update(
     @Param('key') key: string,
     @Body(new ZodValidationPipe(updateSettingSchema)) input: UpdateSettingInput,
     @Req() req: AuthenticatedRequest,
   ) {
-    await this.settingsService.set(key, input.value, getAuditContext(req));
+    if (input.value) {
+      await this.settingsService.set(key, input.value, getAuditContext(req));
+    } else {
+      await this.settingsService.remove(key, getAuditContext(req));
+    }
     return successResponse(null, 'Setting updated');
+  }
+
+  @Delete('admin/settings/:key')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin', 'maestro')
+  @ApiBearerAuth()
+  async remove(
+    @Param('key') key: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    await this.settingsService.remove(key, getAuditContext(req));
+    return successResponse(null, 'Setting removed');
   }
 }
