@@ -48,46 +48,37 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   ];
 
   return (
-    <div dir="rtl" style={{ position: 'relative' }}>
-      {/* Pattern overlay for admin - very subtle */}
-      <div style={{
-        position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0,
-        backgroundImage: 'url(/brand/banco-arabesque-pattern.svg)',
-        backgroundSize: '400px 400px',
-        opacity: 0.025,
-        color: 'rgba(201, 150, 26, 0.6)',
-      }} />
-      <div className="sidebar" style={{ position: 'relative', zIndex: 1 }}>
-        <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--br-gold)', marginBottom: 24, textAlign: 'center' }}>
-          Banco Ricco
-        </div>
-        <div style={{ fontSize: 12, color: 'var(--br-muted)', marginBottom: 16 }}>
-          {user?.fullName || 'مايسترو'}{user?.role ? ` · ${user.role}` : ''}
-        </div>
+    <div className="admin-shell" dir="rtl">
+      <aside className="admin-sidebar">
+        <div className="admin-sidebar-brand">Banco Ricco</div>
+        {user && (
+          <div className="admin-sidebar-user">
+            {user.fullName || 'مايسترو'}{user.role ? ` · ${user.role}` : ''}
+          </div>
+        )}
         {links.map(link => (
           <Link
             key={link.href}
             href={link.href}
-            className={pathname === link.href || (link.href !== '/dashboard' && pathname.startsWith(`${link.href}/`)) ? 'active' : ''}
+            className={
+              'admin-sidebar-link' +
+              (pathname === link.href || (link.href !== '/dashboard' && pathname.startsWith(`${link.href}/`))
+                ? ' active'
+                : '')
+            }
           >
-            <span className="sidebar-icon">{link.icon}</span>
-            {link.label}
+            <span className="admin-sidebar-icon">{link.icon}</span>
+            <span>{link.label}</span>
           </Link>
         ))}
-        <div style={{ flex: 1 }} />
-        <button onClick={logout} style={{
-          background: 'rgba(255,255,255,0.1)',
-          color: 'var(--br-muted)',
-          padding: '12px 16px',
-          borderRadius: 8,
-          textAlign: 'right',
-          fontSize: 14,
-        }}>
+        <button onClick={logout} className="admin-sidebar-logout">
           تسجيل الخروج
         </button>
-      </div>
-      <div className="main-content">
-        {children}
+      </aside>
+      <div className="admin-main">
+        <main className="admin-content">
+          {children}
+        </main>
       </div>
     </div>
   );

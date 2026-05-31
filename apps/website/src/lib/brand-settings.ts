@@ -33,6 +33,11 @@ export async function getPublicBrandSettings(): Promise<PublicBrandSettings> {
     const json = await res.json();
     if (!json.success) return { ...defaultBrandSettings };
     const data = json.data as Record<string, string | null>;
+
+    if (process.env.NODE_ENV === 'development') {
+      console.info('[BrandSettings] Public settings loaded', data);
+    }
+
     return {
       brand_logo_main: data.brand_logo_main ?? defaultBrandSettings.brand_logo_main,
       brand_logo_dark: data.brand_logo_dark ?? defaultBrandSettings.brand_logo_dark,
@@ -50,5 +55,7 @@ export async function getPublicBrandSettings(): Promise<PublicBrandSettings> {
 
 export function resolveBrandAsset(url: string | null, fallback: string): string {
   if (!url) return fallback;
-  return resolveMediaUrl(url) || fallback;
+  const resolved = resolveMediaUrl(url);
+  if (!resolved) return fallback;
+  return resolved;
 }

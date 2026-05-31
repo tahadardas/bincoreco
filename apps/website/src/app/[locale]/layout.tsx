@@ -2,12 +2,12 @@ import { ReactNode } from 'react';
 import { AuthProvider } from '@/lib/auth-context';
 import { BrandProvider } from '@/lib/brand-context';
 import Header from '@/components/header';
+import LocaleHeadUpdater from '@/components/locale-head-updater';
 import { getPublicBrandSettings, resolveBrandAsset } from '@/lib/brand-settings';
 import { resolveMediaUrl } from '@/lib/media';
 
 export default async function LocaleLayout({ children, params }: { children: ReactNode; params: { locale: string } }) {
   const dir = params.locale === 'ar' ? 'rtl' : 'ltr';
-  const lang = params.locale === 'ar' ? 'ar' : 'en';
   const brand = await getPublicBrandSettings();
 
   const markUrl = resolveBrandAsset(brand.brand_mark, '/brand/br-monogram.png');
@@ -15,17 +15,15 @@ export default async function LocaleLayout({ children, params }: { children: Rea
   const patternUrl = resolveBrandAsset(brand.brand_pattern, '/brand/banco-arabesque-pattern.svg');
   const faviconUrl = resolveMediaUrl(brand.brand_favicon) || '/favicon.ico';
 
+  const brandVars = {
+    '--br-brand-pattern-url': `url("${patternUrl}")`,
+  } as React.CSSProperties;
+
   return (
-    <html lang={lang} dir={dir}>
-      <head>
-        <title>Banco Ricco</title>
-        <meta name="description" content="Banco Ricco - Premium Coffee Experience" />
-        <link rel="icon" href={faviconUrl} />
-        <style>{`:root { --br-brand-pattern-url: url("${patternUrl}"); }`}</style>
-      </head>
-      <body>
-        <AuthProvider>
-          <BrandProvider settings={brand}>
+    <AuthProvider>
+      <BrandProvider settings={brand}>
+        <LocaleHeadUpdater lang={params.locale === 'ar' ? 'ar' : 'en'} favicon={faviconUrl} />
+        <div dir={dir} className="site-shell" style={brandVars}>
           <Header brandMark={markUrl} />
           <main style={{ minHeight: 'calc(100vh - 80px)' }}>
             {children}
@@ -69,9 +67,8 @@ export default async function LocaleLayout({ children, params }: { children: Rea
               &copy; {new Date().getFullYear()} Banco Ricco · {params.locale === 'ar' ? 'نحترم البن' : 'We Respect the Beans'}
             </div>
           </footer>
-        </BrandProvider>
-        </AuthProvider>
-      </body>
-    </html>
+        </div>
+      </BrandProvider>
+    </AuthProvider>
   );
 }

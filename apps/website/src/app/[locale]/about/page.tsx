@@ -1,6 +1,7 @@
 'use client';
 import { useParams, useRouter } from 'next/navigation';
 import { getDictionary, Locale } from '@/lib/dictionaries';
+import { useBrand } from '@/lib/brand-context';
 import { api } from '@/lib/api';
 import EspressoButton from '@/components/espresso-button';
 import { RevealSection } from '@/components/scroll-reveal';
@@ -11,6 +12,7 @@ export default function AboutPage() {
   const locale = (params.locale as Locale) || 'ar';
   const dict = getDictionary(locale);
   const dir = locale === 'ar' ? 'rtl' : 'ltr';
+  const { resolvedMark } = useBrand();
 
   return (
     <div>
@@ -23,7 +25,7 @@ export default function AboutPage() {
         padding: '82px 0 58px',
       }}>
         <img
-          src="/brand/br-monogram.png"
+          src={resolvedMark}
           alt=""
           aria-hidden="true"
           style={{
@@ -40,10 +42,10 @@ export default function AboutPage() {
             <div className="section-eyebrow" style={{ color: 'var(--br-gold-light)', marginBottom: 12 }}>
               Banco Ricco
             </div>
-            <h1 style={{ fontSize: 56, lineHeight: 1.06, fontWeight: 900, color: 'var(--br-gold-light)', marginBottom: 18 }}>
+            <h1 style={{ fontSize: 'clamp(32px, 6vw, 56px)', lineHeight: 1.06, fontWeight: 900, color: 'var(--br-gold-light)', marginBottom: 18 }}>
               {dict.about.heroTitle}
             </h1>
-            <p style={{ fontSize: 20, color: 'rgba(255,250,240,0.86)', maxWidth: 600, marginBottom: 30 }}>
+            <p style={{ fontSize: 'clamp(16px, 2.5vw, 20px)', color: 'rgba(255,250,240,0.86)', maxWidth: 600, marginBottom: 30 }}>
               {dict.about.heroSub}
             </p>
           </div>
@@ -138,7 +140,7 @@ export default function AboutPage() {
                 aspectRatio: '1 / 1',
               }}>
                 <img
-                  src="/brand/br-monogram.png"
+                  src={resolvedMark}
                   alt="BR"
                   style={{ width: '60%', maxHeight: '60%', objectFit: 'contain', opacity: 0.6 }}
                 />

@@ -24,6 +24,9 @@ export interface AdminDataTableProps<T> {
   onRowClick?: (item: T) => void;
   actions?: (item: T) => ReactNode;
   imageUrl?: (item: T) => string | null | undefined;
+  compact?: boolean;
+  hideColumnsOnMobile?: string[];
+  minTableWidth?: number;
 }
 
 function ImageCell({ src, alt }: { src?: string | null; alt: string }) {
@@ -89,6 +92,7 @@ const pulseStyles = `
 export default function AdminDataTable<T>({
   columns, data, loading, error, onRetry, emptyMessage = 'لا توجد بيانات', rowKey,
   page, totalPages, onPageChange, onRowClick, actions, imageUrl,
+  compact, hideColumnsOnMobile = [], minTableWidth,
 }: AdminDataTableProps<T>) {
   if (loading) {
     return (
@@ -153,12 +157,25 @@ export default function AdminDataTable<T>({
 
   const visibleColumns = columns;
 
+  const mobileColumns = visibleColumns.filter(col => !hideColumnsOnMobile.includes(col.key));
+
+  const cardStyle: React.CSSProperties = compact
+    ? { padding: 0 }
+    : { padding: 0 };
+
+  const cellStyle: React.CSSProperties = compact
+    ? { padding: '8px 10px', fontSize: 13 }
+    : {};
+
+  const tableStyle: React.CSSProperties = {};
+  if (minTableWidth) tableStyle.minWidth = minTableWidth;
+
   return (
     <>
       <style>{pulseStyles}</style>
-      <div className="card" style={{ padding: 0 }}>
+      <div className="card" style={cardStyle}>
         <div className="dt-scroll dt-desktop">
-          <table className="table dt-sticky">
+          <table className="table dt-sticky" style={tableStyle}>
             <thead>
               <tr>
                 {visibleColumns.map(col => (
@@ -175,12 +192,12 @@ export default function AdminDataTable<T>({
                   style={{ cursor: onRowClick ? 'pointer' : undefined }}
                 >
                   {visibleColumns.map(col => (
-                    <td key={col.key} style={{ ...col.style, minWidth: col.minWidth }}>
+                    <td key={col.key} style={{ ...col.style, minWidth: col.minWidth, ...cellStyle }}>
                       {renderCell(item, col)}
                     </td>
                   ))}
                   {hasActions && (
-                    <td style={{ textAlign: 'left', whiteSpace: 'nowrap' }} onClick={e => e.stopPropagation()}>
+                    <td style={{ textAlign: 'left', whiteSpace: 'nowrap', ...cellStyle }} onClick={e => e.stopPropagation()}>
                       {actions!(item)}
                     </td>
                   )}
@@ -190,23 +207,24 @@ export default function AdminDataTable<T>({
           </table>
         </div>
 
-        <div className="dt-mobile" style={{ flexDirection: 'column', gap: 12, padding: 16 }}>
+        <div className="dt-mobile" style={{ flexDirection: 'column', gap: compact ? 8 : 12, padding: compact ? 12 : 16 }}>
           {data.map(item => (
             <div
               key={rowKey(item)}
               className="card"
-              style={{ padding: 16, cursor: onRowClick ? 'pointer' : undefined }}
+              style={{ padding: compact ? 12 : 16, cursor: onRowClick ? 'pointer' : undefined }}
               onClick={() => onRowClick?.(item)}
             >
-              {visibleColumns.map(col => (
+              {mobileColumns.map(col => (
                 <div
                   key={col.key}
                   style={{
                     display: 'flex', justifyContent: 'space-between',
-                    padding: '6px 0', borderBottom: '1px solid #f0f0f0', fontSize: 14, gap: 8,
+                    padding: '6px 0', borderBottom: '1px solid #f0f0f0',
+                    fontSize: compact ? 13 : 14, gap: 8,
                   }}
                 >
-                  <span style={{ color: 'var(--br-muted)', fontWeight: 600, fontSize: 13, whiteSpace: 'nowrap' }}>
+                  <span style={{ color: 'var(--br-muted)', fontWeight: 600, fontSize: compact ? 12 : 13, whiteSpace: 'nowrap' }}>
                     {col.label}
                   </span>
                   <span style={{ textAlign: 'left' }}>{renderCell(item, col)}</span>

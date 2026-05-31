@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { getDictionary, Locale } from '@/lib/dictionaries';
+import { useBrand } from '@/lib/brand-context';
 import AuthModal from '@/components/auth-modal';
 import EspressoButton from '@/components/espresso-button';
 import ProductCard, { ProductSummary } from '@/components/product-card';
@@ -51,6 +52,7 @@ export default function HomePage() {
   const router = useRouter();
   const locale = (params.locale as Locale) || 'ar';
   const dict = getDictionary(locale);
+  const { resolvedMark } = useBrand();
   const [banners, setBanners] = useState<Banner[]>([]);
   const [bestSellers, setBestSellers] = useState<ProductSummary[]>([]);
   const [maestroPicks, setMaestroPicks] = useState<ProductSummary[]>([]);
@@ -91,7 +93,7 @@ export default function HomePage() {
   if (loading) {
     return (
       <div className="page-shell" style={{ textAlign: 'center' }}>
-        <img src="/brand/br-monogram.png" alt="" style={{ width: 96, height: 96, objectFit: 'contain', marginBottom: 16 }} />
+        <img src={resolvedMark} alt="" style={{ width: 96, height: 96, objectFit: 'contain', marginBottom: 16 }} />
         <div style={{ fontSize: 24, color: 'var(--br-gold)', fontWeight: 900 }}>Banco Ricco</div>
         <div style={{ marginTop: 10, color: 'var(--br-muted)' }}>Loading...</div>
       </div>
@@ -109,7 +111,7 @@ export default function HomePage() {
         padding: '82px 0 58px',
       }}>
         <img
-          src="/brand/br-monogram.png"
+          src={resolvedMark}
           alt=""
           aria-hidden="true"
           style={{
@@ -126,10 +128,10 @@ export default function HomePage() {
             <div className="section-eyebrow" style={{ color: 'var(--br-gold-light)', marginBottom: 12 }}>
               {dict.home.heroEyebrow}
             </div>
-            <h1 style={{ fontSize: 56, lineHeight: 1.06, fontWeight: 900, color: 'var(--br-gold-light)', marginBottom: 18 }}>
+            <h1 style={{ fontSize: 'clamp(32px, 6vw, 56px)', lineHeight: 1.06, fontWeight: 900, color: 'var(--br-gold-light)', marginBottom: 18 }}>
               {dict.home.title}
             </h1>
-            <p style={{ fontSize: 20, color: 'rgba(255,250,240,0.86)', maxWidth: 680, marginBottom: 30 }}>
+            <p style={{ fontSize: 'clamp(16px, 2.5vw, 20px)', color: 'rgba(255,250,240,0.86)', maxWidth: 680, marginBottom: 30 }}>
               {dict.home.subtitle}
             </p>
             <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
@@ -149,7 +151,7 @@ export default function HomePage() {
             boxShadow: '0 20px 60px rgba(0,0,0,0.24)',
           }}>
             <div style={{ aspectRatio: '1 / 1', display: 'grid', placeItems: 'center', border: '1px solid rgba(201,150,26,0.28)', borderRadius: 8 }}>
-              <img src="/brand/br-monogram.png" alt="BR Banco Ricco" style={{ width: '70%', maxHeight: '80%', objectFit: 'contain' }} />
+              <img src={resolvedMark} alt="BR Banco Ricco" style={{ width: '70%', maxHeight: '80%', objectFit: 'contain' }} />
             </div>
             <div style={{ marginTop: 14, color: 'rgba(255,250,240,0.8)', fontWeight: 700 }}>
               {dict.home.respectBeans}
