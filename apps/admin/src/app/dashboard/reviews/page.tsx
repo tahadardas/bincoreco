@@ -126,9 +126,8 @@ export default function ReviewsPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await adminFetch<ReviewsResponse>(`/admin/reviews?${queryString}`);
-      setReviews(res.data);
-      setPagination(res.pagination);
+      const items = await adminFetch<Review[]>(`/admin/reviews?${queryString}`);
+      setReviews(items || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'تعذر تحميل التقييمات');
     } finally {

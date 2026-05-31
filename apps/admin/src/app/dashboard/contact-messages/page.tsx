@@ -86,9 +86,8 @@ export default function ContactMessagesPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await adminFetch<ContactMessagesResponse>(`/admin/contact-messages?${queryString}`);
-      setMessages(res.data);
-      setPagination(res.pagination);
+      const items = await adminFetch<ContactMessage[]>(`/admin/contact-messages?${queryString}`);
+      setMessages(items || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'تعذر تحميل الرسائل');
     } finally {
