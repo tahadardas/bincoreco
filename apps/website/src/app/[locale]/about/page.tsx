@@ -16,11 +16,9 @@ export default function AboutPage() {
 
   return (
     <div>
-      <section style={{
+      <section className="bg-hero-dark" style={{
         position: 'relative',
         overflow: 'hidden',
-        background:
-          'linear-gradient(135deg, rgba(11,10,8,0.98), rgba(27,16,11,0.94)), repeating-linear-gradient(45deg, rgba(201,150,26,0.16) 0 1px, transparent 1px 18px)',
         color: 'var(--br-white)',
         padding: '82px 0 58px',
       }}>
@@ -215,9 +213,8 @@ export default function AboutPage() {
       <RevealSection>
         <section className="page-shell">
           <div className="container">
-            <div className="card" style={{
+            <div className="card bg-hero-dark" style={{
               padding: 48, textAlign: 'center',
-              background: 'linear-gradient(135deg, rgba(11,10,8,0.98), rgba(27,16,11,0.94)), repeating-linear-gradient(45deg, rgba(201,150,26,0.16) 0 1px, transparent 1px 18px)',
               color: 'var(--br-white)',
               border: '1px solid rgba(201,150,26,0.38)',
             }}>

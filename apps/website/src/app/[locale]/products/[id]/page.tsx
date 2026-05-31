@@ -212,7 +212,7 @@ export default function ProductDetailPage() {
                   )}
                 </div>
               ) : resolveMediaUrl(product.imageUrl) ? (
-                <div style={{ minHeight: 420, display: 'grid', placeItems: 'center', background: 'linear-gradient(135deg, rgba(27,16,11,0.94), rgba(75,46,30,0.84)), repeating-linear-gradient(45deg, rgba(201,150,26,0.13) 0 1px, transparent 1px 16px)' }}>
+                <div className="bg-hero-subtle" style={{ minHeight: 420, display: 'grid', placeItems: 'center' }}>
                   <img src={resolveMediaUrl(product.imageUrl)!} alt={translation.name} style={{ width: '100%', height: 420, objectFit: 'cover' }} />
                 </div>
               ) : brand.resolvedFallbackImage ? (

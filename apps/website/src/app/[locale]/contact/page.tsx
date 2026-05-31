@@ -100,11 +100,9 @@ export default function ContactPage() {
   return (
     <div className="page-shell" dir={dir}>
       {/* Hero */}
-      <section style={{
+      <section className="bg-hero-dark" style={{
         position: 'relative',
         overflow: 'hidden',
-        background:
-          'linear-gradient(135deg, rgba(11,10,8,0.98), rgba(27,16,11,0.94)), repeating-linear-gradient(45deg, rgba(201,150,26,0.16) 0 1px, transparent 1px 18px)',
         color: 'var(--br-white)',
         padding: '82px 0 58px',
         marginTop: -34,
