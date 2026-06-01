@@ -92,6 +92,15 @@ export class ProductsController {
 
   @Get('products/:id')
   async findById(@Param('id') id: string, @Query('locale') locale?: string) {
+    const item = await this.productsService.findPublicById(id, locale);
+    return successResponse(item);
+  }
+
+  @Get('admin/products/:id')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin', 'maestro')
+  @ApiBearerAuth()
+  async findByIdForAdmin(@Param('id') id: string, @Query('locale') locale?: string) {
     const item = await this.productsService.findById(id, locale);
     return successResponse(item);
   }

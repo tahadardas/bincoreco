@@ -47,15 +47,17 @@ enum ReviewSource {
 }
 
 model User {
-  id           String   @id @default(uuid())
-  email        String?  @unique
-  phone        String?  @unique
-  passwordHash String?
-  fullName     String
-  role         String   @default("customer")
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                  String    @id @default(uuid())
+  email               String?   @unique
+  phone               String?   @unique
+  passwordHash        String?
+  fullName            String
+  role                String    @default("customer")
+  isActive            Boolean   @default(true)
+  mustChangePassword  Boolean   @default(false)
+  passwordUpdatedAt   DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   customerProfile CustomerProfile?
   cart            Cart?
@@ -453,35 +455,58 @@ model QRCard {
   @@map("qr_cards")
 }
 
+enum BannerPlacement {
+  HOME_HERO
+  HOME_PROMO
+}
+
 model Currency {
-  code        String  @id
+  code        String   @id
   name        String
+  nameAr      String?
+  nameEn      String?
   symbol      String
-  isDefault   Boolean @default(false)
-  isActive    Boolean @default(true)
+  isDefault   Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
 
   @@map("currencies")
 }
 
+model ProductSizeOption {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  nameAr      String
+  nameEn      String
+  sizeValue   Float?
+  sizeUnit    String?
+  productType ProductType?
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+
+  @@map("product_size_options")
+}
+
 model Banner {
-  id              String   @id @default(uuid())
+  id              String           @id @default(uuid())
+  placement       BannerPlacement  @default(HOME_PROMO)
   imageUrl        String
   mobileImageUrl  String?
   linkUrl         String?
   ctaTextAr       String?
   ctaTextEn       String?
   ctaUrl          String?
-  animationType   String   @default("fade")
-  displayMode     String   @default("fullWidthHero")
-  overlayOpacity  Float    @default(0.35)
-  textPosition    String   @default("center")
-  textColor       String   @default("light")
+  animationType   String           @default("fade")
+  displayMode     String           @default("fullWidthHero")
+  overlayOpacity  Float            @default(0.35)
+  textPosition    String           @default("center")
+  textColor       String           @default("light")
   startsAt        DateTime?
   endsAt          DateTime?
-  sortOrder       Int      @default(0)
-  isActive        Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  sortOrder       Int              @default(0)
+  isActive        Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
   translations BannerTranslation[]
 

@@ -13,6 +13,7 @@ import { getGuestSession } from '@/lib/guest-session';
 import { resolveMediaUrl } from '@/lib/media';
 import ProductReviews from '@/components/product-reviews';
 import { useBrand } from '@/lib/brand-context';
+import { useCurrency } from '@/lib/currency-context';
 
 interface Product {
   id: string;
@@ -83,12 +84,15 @@ export default function ProductDetailPage() {
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const brand = useBrand();
+  const { selectedCurrency } = useCurrency();
 
-  const isCoffeeBean = product?.type === 'COFFEE_BEAN';
+  const isCoffeeBeanOrGround = product?.type === 'COFFEE_BEAN' || product?.type === 'GROUND_COFFEE';
+  const isGroundCoffee = product?.type === 'GROUND_COFFEE';
   const availableGrindOptions = product?.grindOptions
     ?.filter(link => link.isActive && link.grindOption.isActive)
     .map(link => link.grindOption) || [];
-  const needsGrindSelection = Boolean(isCoffeeBean && isGround && !selectedGrind);
+  const needsGrindSelection = Boolean(isCoffeeBeanOrGround && isGround && !selectedGrind);
+  const noGrindOptionsAvailable = isCoffeeBeanOrGround && availableGrindOptions.length === 0;
 
   useEffect(() => {
     const id = params.id as string;
@@ -97,6 +101,9 @@ export default function ProductDetailPage() {
         setProduct(item);
         if (item.variants.length > 0) {
           setSelectedVariant(item.variants[0].id);
+        }
+        if (item.type === 'GROUND_COFFEE') {
+          setIsGround(true);
         }
       })
       .catch(err => setError(err instanceof Error ? err.message : 'Product not found'))
@@ -108,7 +115,7 @@ export default function ProductDetailPage() {
   }, [locale, product]);
 
   const variant = product?.variants.find(item => item.id === selectedVariant) || product?.variants[0];
-  const selectedPrice = variant?.prices.find(price => price.currencyCode === 'SYP') || variant?.prices[0];
+  const selectedPrice = variant?.prices.find(price => price.currencyCode === (selectedCurrency?.code || 'SYP')) || variant?.prices[0];
 
   const handleAddToCart = async () => {
     if (!product) return;
@@ -120,16 +127,22 @@ export default function ProductDetailPage() {
       setError(null);
       try {
         const selectedOptions: { grindType?: 'whole_bean' | 'ground'; grindOptionId?: string } = {};
-        if (isCoffeeBean) {
-          selectedOptions.grindType = isGround ? 'ground' : 'whole_bean';
-          if (isGround && selectedGrind) {
-            selectedOptions.grindOptionId = selectedGrind;
+        if (isCoffeeBeanOrGround) {
+          if (isGroundCoffee) {
+            selectedOptions.grindType = 'ground';
+            if (selectedGrind) selectedOptions.grindOptionId = selectedGrind;
+          } else {
+            selectedOptions.grindType = isGround ? 'ground' : 'whole_bean';
+            if (isGround && selectedGrind) {
+              selectedOptions.grindOptionId = selectedGrind;
+            }
           }
         }
         await api.post(`/guest-cart/items?sessionId=${sessionId}`, {
           productId: product.id,
           variantId: selectedVariant || undefined,
           quantity,
+          currencyCode: selectedCurrency?.code || 'SYP',
           selectedOptions,
         });
         setAdded(true);
@@ -146,10 +159,15 @@ export default function ProductDetailPage() {
     setError(null);
     try {
       const selectedOptions: { grindType?: 'whole_bean' | 'ground'; grindOptionId?: string } = {};
-      if (isCoffeeBean) {
-        selectedOptions.grindType = isGround ? 'ground' : 'whole_bean';
-        if (isGround && selectedGrind) {
-          selectedOptions.grindOptionId = selectedGrind;
+      if (isCoffeeBeanOrGround) {
+        if (isGroundCoffee) {
+          selectedOptions.grindType = 'ground';
+          if (selectedGrind) selectedOptions.grindOptionId = selectedGrind;
+        } else {
+          selectedOptions.grindType = isGround ? 'ground' : 'whole_bean';
+          if (isGround && selectedGrind) {
+            selectedOptions.grindOptionId = selectedGrind;
+          }
         }
       }
 
@@ -157,6 +175,7 @@ export default function ProductDetailPage() {
         productId: product.id,
         variantId: selectedVariant || undefined,
         quantity,
+        currencyCode: selectedCurrency?.code || 'SYP',
         selectedOptions,
       }, token);
       setAdded(true);
@@ -290,62 +309,119 @@ export default function ProductDetailPage() {
               </div>
             )}
 
-            {isCoffeeBean && (
+            {isCoffeeBeanOrGround && (
               <div style={{ marginBottom: 22 }}>
                 <label style={{ fontWeight: 900, display: 'block', marginBottom: 10 }}>{dict.product.form}</label>
-                <div className="option-grid" style={{ marginBottom: 12 }}>
-                  <button
-                    onClick={() => { setIsGround(false); setSelectedGrind(''); }}
-                    className={`choice-card ${!isGround ? 'choice-card--selected' : ''}`}
-                    style={{ minHeight: 90 }}
-                  >
-                    <div style={{ fontSize: 32, marginBottom: 6 }}>🫘</div>
-                    <strong>{dict.product.wholeBean}</strong>
-                    <span style={{ fontSize: 12 }}>{locale === 'ar' ? 'بدون طحن' : 'No grind'}</span>
-                  </button>
-                  <button
-                    onClick={() => setIsGround(true)}
-                    className={`choice-card ${isGround ? 'choice-card--selected' : ''}`}
-                    style={{ minHeight: 90 }}
-                  >
-                    <div style={{ fontSize: 32, marginBottom: 6 }}>⚙️</div>
-                    <strong>{dict.product.ground}</strong>
-                    <span style={{ fontSize: 12 }}>{dict.product.selectGrind}</span>
-                  </button>
-                </div>
 
-                {isGround && (
-                  <div className="option-grid">
-                    {availableGrindOptions.map(option => (
+                {isGroundCoffee ? (
+                  <>
+                    {noGrindOptionsAvailable ? (
+                      <div className="card" style={{ padding: 16, background: 'rgba(180, 35, 24, 0.08)', border: '1px solid rgba(180, 35, 24, 0.2)', color: 'var(--br-danger)', fontWeight: 700, fontSize: 14 }}>
+                        {locale === 'ar' ? 'لم يتم ضبط طرق الطحن لهذا المنتج من لوحة التحكم.' : 'Grind options have not been configured for this product.'}
+                      </div>
+                    ) : (
+                      <>
+                        {isGround && (
+                          <div className="option-grid" style={{ marginBottom: 12 }}>
+                            {availableGrindOptions.map(option => (
+                              <button
+                                key={option.id}
+                                onClick={() => setSelectedGrind(option.id)}
+                                className={`choice-card ${selectedGrind === option.id ? 'choice-card--selected' : ''}`}
+                                style={{ minHeight: 100 }}
+                              >
+                                <div style={{ fontSize: 28, marginBottom: 6 }}>
+                                  {option.code === 'ESPRESSO' ? '☕' :
+                                   option.code === 'TURKISH' || option.code === 'TURKISH_SHAMI' ? '🏺' :
+                                   option.code === 'FRENCH_PRESS' ? '🫖' :
+                                   option.code === 'POUR_OVER' || option.code === 'V60' ? '⏳' :
+                                   option.code === 'AEROPRESS' ? '💨' :
+                                   option.code === 'MOKA_POT' ? '🍵' :
+                                   option.code === 'AMERICAN_COFFEE' ? '🇺🇸' :
+                                   option.code === 'COLD_BREW' ? '🧊' :
+                                   option.code === 'WHOLE_BEAN' ? '🫘' : '⚙️'}
+                                </div>
+                                <strong>{locale === 'ar' ? option.nameAr : option.nameEn}</strong>
+                                <span style={{ fontSize: 12 }}>
+                                  {locale === 'ar' ? option.descriptionAr : option.descriptionEn || ''}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {needsGrindSelection && (
+                          <div style={{ color: 'var(--br-danger)', fontSize: 14, marginTop: 10, fontWeight: 800 }}>
+                            {dict.product.chooseGrindFirst}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <div className="option-grid" style={{ marginBottom: 12 }}>
                       <button
-                        key={option.id}
-                        onClick={() => setSelectedGrind(option.id)}
-                        className={`choice-card ${selectedGrind === option.id ? 'choice-card--selected' : ''}`}
-                        style={{ minHeight: 100 }}
+                        onClick={() => { setIsGround(false); setSelectedGrind(''); }}
+                        className={`choice-card ${!isGround ? 'choice-card--selected' : ''}`}
+                        style={{ minHeight: 90 }}
                       >
-                        <div style={{ fontSize: 28, marginBottom: 6 }}>
-                          {option.code === 'ESPRESSO' ? '☕' :
-                           option.code === 'TURKISH' || option.code === 'TURKISH_SHAMI' ? '🏺' :
-                           option.code === 'FRENCH_PRESS' ? '🫖' :
-                           option.code === 'POUR_OVER' || option.code === 'V60' ? '⏳' :
-                           option.code === 'AEROPRESS' ? '💨' :
-                           option.code === 'MOKA_POT' ? '🍵' :
-                           option.code === 'AMERICAN_COFFEE' ? '🇺🇸' :
-                           option.code === 'COLD_BREW' ? '🧊' :
-                           option.code === 'WHOLE_BEAN' ? '🫘' : '⚙️'}
-                        </div>
-                        <strong>{locale === 'ar' ? option.nameAr : option.nameEn}</strong>
-                        <span style={{ fontSize: 12 }}>
-                          {locale === 'ar' ? option.descriptionAr : option.descriptionEn || ''}
-                        </span>
+                        <div style={{ fontSize: 32, marginBottom: 6 }}>🫘</div>
+                        <strong>{dict.product.wholeBean}</strong>
+                        <span style={{ fontSize: 12 }}>{locale === 'ar' ? 'بدون طحن' : 'No grind'}</span>
                       </button>
-                    ))}
-                  </div>
-                )}
-                {needsGrindSelection && (
-                  <div style={{ color: 'var(--br-danger)', fontSize: 14, marginTop: 10, fontWeight: 800 }}>
-                    {dict.product.chooseGrindFirst}
-                  </div>
+                      <button
+                        onClick={() => setIsGround(true)}
+                        className={`choice-card ${isGround ? 'choice-card--selected' : ''}`}
+                        style={{ minHeight: 90 }}
+                      >
+                        <div style={{ fontSize: 32, marginBottom: 6 }}>⚙️</div>
+                        <strong>{dict.product.ground}</strong>
+                        <span style={{ fontSize: 12 }}>{dict.product.selectGrind}</span>
+                      </button>
+                    </div>
+
+                    {isGround && (
+                      <>
+                        {noGrindOptionsAvailable ? (
+                          <div className="card" style={{ padding: 16, background: 'rgba(180, 35, 24, 0.08)', border: '1px solid rgba(180, 35, 24, 0.2)', color: 'var(--br-danger)', fontWeight: 700, fontSize: 14 }}>
+                            {locale === 'ar' ? 'لم يتم ضبط طرق الطحن لهذا المنتج من لوحة التحكم.' : 'Grind options have not been configured for this product.'}
+                          </div>
+                        ) : (
+                          <div className="option-grid">
+                            {availableGrindOptions.map(option => (
+                              <button
+                                key={option.id}
+                                onClick={() => setSelectedGrind(option.id)}
+                                className={`choice-card ${selectedGrind === option.id ? 'choice-card--selected' : ''}`}
+                                style={{ minHeight: 100 }}
+                              >
+                                <div style={{ fontSize: 28, marginBottom: 6 }}>
+                                  {option.code === 'ESPRESSO' ? '☕' :
+                                   option.code === 'TURKISH' || option.code === 'TURKISH_SHAMI' ? '🏺' :
+                                   option.code === 'FRENCH_PRESS' ? '🫖' :
+                                   option.code === 'POUR_OVER' || option.code === 'V60' ? '⏳' :
+                                   option.code === 'AEROPRESS' ? '💨' :
+                                   option.code === 'MOKA_POT' ? '🍵' :
+                                   option.code === 'AMERICAN_COFFEE' ? '🇺🇸' :
+                                   option.code === 'COLD_BREW' ? '🧊' :
+                                   option.code === 'WHOLE_BEAN' ? '🫘' : '⚙️'}
+                                </div>
+                                <strong>{locale === 'ar' ? option.nameAr : option.nameEn}</strong>
+                                <span style={{ fontSize: 12 }}>
+                                  {locale === 'ar' ? option.descriptionAr : option.descriptionEn || ''}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
+                    {needsGrindSelection && (
+                      <div style={{ color: 'var(--br-danger)', fontSize: 14, marginTop: 10, fontWeight: 800 }}>
+                        {dict.product.chooseGrindFirst}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -354,7 +430,7 @@ export default function ProductDetailPage() {
               <div>
                 <div style={{ color: 'var(--br-muted)', fontSize: 13 }}>{dict.product.price}</div>
                 <div style={{ fontSize: 30, fontWeight: 900, color: 'var(--br-gold-dark)' }}>
-                  {selectedPrice ? formatMoney(selectedPrice.amount, selectedPrice.currencyCode) : ''}
+                  {selectedPrice ? formatMoney(selectedPrice.amount, selectedCurrency || selectedPrice.currencyCode) : ''}
                 </div>
               </div>
               <div className="quantity-control">

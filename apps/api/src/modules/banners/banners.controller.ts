@@ -8,6 +8,8 @@ import { Roles } from '../../common/auth/roles.decorator';
 import { RolesGuard } from '../../common/auth/roles.guard';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 
+const placementEnum = z.enum(['HOME_HERO', 'HOME_PROMO']);
+
 const animationTypeEnum = z.enum([
   'fade',
   'slideLeft',
@@ -38,6 +40,7 @@ const bannerTranslationSchema = z.object({
 });
 
 const bannerBaseSchema = z.object({
+  placement: placementEnum.default('HOME_PROMO'),
   imageUrl: z.string().min(1),
   mobileImageUrl: z.string().optional(),
   linkUrl: z.string().optional(),
@@ -80,8 +83,8 @@ export class BannersController {
   constructor(private bannersService: BannersService) {}
 
   @Get('banners')
-  async findAll(@Query('locale') locale?: string) {
-    const items = await this.bannersService.findAll(locale);
+  async findAll(@Query('locale') locale?: string, @Query('placement') placement?: string) {
+    const items = await this.bannersService.findAll(locale, placement);
     return successResponse(items);
   }
 

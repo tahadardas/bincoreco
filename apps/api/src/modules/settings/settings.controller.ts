@@ -27,6 +27,12 @@ export class SettingsController {
     return successResponse(data);
   }
 
+  @Get('settings/public-content')
+  async getPublicContent() {
+    const data = await this.settingsService.getPublicContentSettings();
+    return successResponse(data);
+  }
+
   @Get('admin/settings')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('admin', 'maestro')
@@ -51,6 +57,24 @@ export class SettingsController {
       await this.settingsService.remove(key, getAuditContext(req));
     }
     return successResponse(null, 'Setting updated');
+  }
+
+  @Put('admin/settings/batch')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin', 'maestro')
+  @ApiBearerAuth()
+  async updateBatch(
+    @Body() body: Record<string, string>,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    for (const [key, value] of Object.entries(body)) {
+      if (value) {
+        await this.settingsService.set(key, value, getAuditContext(req));
+      } else {
+        await this.settingsService.remove(key, getAuditContext(req));
+      }
+    }
+    return successResponse(null, 'Settings updated');
   }
 
   @Delete('admin/settings/:key')

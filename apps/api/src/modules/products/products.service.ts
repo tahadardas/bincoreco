@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { Prisma, ProductType } from '@prisma/client';
 import { CreateProductInput, UpdateProductInput } from '@banco-ricco/validators';
 import { PrismaService } from '../prisma/prisma.service';
@@ -97,13 +97,42 @@ export class ProductsService {
     return product;
   }
 
+  async findPublicById(id: string, locale?: string) {
+    const product = await this.prisma.product.findFirst({
+      where: { id, isActive: true, deletedAt: null },
+      include: {
+        translations: locale ? { where: { locale } } : true,
+        images: { orderBy: { sortOrder: 'asc' } },
+        variants: {
+          where: { isActive: true },
+          include: { prices: { where: { isActive: true } } },
+          orderBy: { sortOrder: 'asc' },
+        },
+        coffeeProfile: true,
+        grindOptions: {
+          where: { isActive: true },
+          include: { grindOption: true },
+        },
+        category: {
+          include: {
+            translations: locale ? { where: { locale } } : true,
+          },
+        },
+      },
+    });
+    if (!product) throw new NotFoundException('Product not found');
+    return product;
+  }
+
   async findBySku(sku: string) {
     return this.prisma.product.findUnique({ where: { sku } });
   }
 
   async create(data: CreateProductInput, auditContext?: AuditLogContext) {
     const grindOptionIds = await this.validateProductGrindOptions(data.type as ProductType, data.grindOptionIds);
-
+    if (data.variants) {
+      await this.validateVariantCurrencies(data.variants);
+    }
     const product = await this.prisma.product.create({
       data: {
         type: data.type as ProductType,
@@ -183,7 +212,7 @@ export class ProductsService {
     const nextType = (data.type || existing.type) as ProductType;
     const grindOptionIds = data.grindOptionIds !== undefined
       ? await this.validateProductGrindOptions(nextType, data.grindOptionIds)
-      : data.type && nextType !== ProductType.COFFEE_BEAN
+      : data.type && nextType !== ProductType.COFFEE_BEAN && nextType !== ProductType.GROUND_COFFEE
         ? []
         : undefined;
 
@@ -227,6 +256,7 @@ export class ProductsService {
     });
 
     if (data.variants) {
+      await this.validateVariantCurrencies(data.variants);
       await this.updateVariants(id, data.variants);
     }
 
@@ -304,7 +334,7 @@ export class ProductsService {
       return [];
     }
 
-    if (type !== ProductType.COFFEE_BEAN) {
+    if (type !== ProductType.COFFEE_BEAN && type !== ProductType.GROUND_COFFEE) {
       throw new BadRequestException('Grind options can only be linked to coffee bean products');
     }
 
@@ -326,6 +356,47 @@ export class ProductsService {
     return uniqueIds;
   }
 
+  private async validateVariantCurrencies(variants: { name?: string; prices?: { currencyCode: string; amount: number }[] }[]) {
+    const allCodes = [...new Set(variants.flatMap(v => v.prices?.map(p => p.currencyCode.toUpperCase()) || []))];
+    if (!allCodes.length) return;
+
+    const currencies = await this.prisma.currency.findMany({
+      where: { code: { in: allCodes }, isActive: true },
+    });
+    const activeCodes = new Set(currencies.map(c => c.code));
+    const invalidCodes = allCodes.filter(c => !activeCodes.has(c));
+    if (invalidCodes.length) {
+      throw new UnprocessableEntityException(
+        `العملات التالية غير موجودة أو غير مفعلة: ${invalidCodes.join(', ')}. أضفها من صفحة إدارة العملات.`,
+      );
+    }
+
+    for (const variant of variants) {
+      const codes = variant.prices?.map(p => p.currencyCode) || [];
+      const uniqueCodes = new Set(codes);
+      if (uniqueCodes.size !== codes.length) {
+        throw new BadRequestException('لا يمكن تكرار نفس العملة في نفس الخيار');
+      }
+      for (const price of variant.prices || []) {
+        if (price.amount <= 0) {
+          throw new BadRequestException(`السعر بالعملة ${price.currencyCode} يجب أن يكون أكبر من صفر`);
+        }
+      }
+    }
+
+    const defaultCurrency = await this.prisma.currency.findFirst({ where: { isDefault: true, isActive: true } });
+    if (defaultCurrency) {
+      for (const variant of variants) {
+        const codes = variant.prices?.map(p => p.currencyCode) || [];
+        if (!codes.includes(defaultCurrency.code)) {
+          throw new BadRequestException(
+            `الخيار "${variant.name || 'بدون اسم'}" يجب أن يحتوي على سعر بالعملة الافتراضية (${defaultCurrency.code})`,
+          );
+        }
+      }
+    }
+  }
+
   private async updateVariants(productId: string, variants: UpdateProductInput['variants']) {
     if (!variants?.length) {
       return;
@@ -334,44 +405,55 @@ export class ProductsService {
     const existingVariants = await this.prisma.productVariant.findMany({
       where: { productId },
       include: { prices: true },
-      orderBy: { sortOrder: 'asc' },
     });
 
-    for (const [index, variantInput] of variants.entries()) {
-      const existingVariant = existingVariants[index];
-      const variant = existingVariant
-        ? await this.prisma.productVariant.update({
-            where: { id: existingVariant.id },
-            data: {
-              name: variantInput.name,
-              sizeValue: variantInput.sizeValue,
-              sizeUnit: variantInput.sizeUnit,
-              isActive: variantInput.isActive ?? existingVariant.isActive,
-              sortOrder: variantInput.sortOrder ?? existingVariant.sortOrder,
-            },
-          })
-        : await this.prisma.productVariant.create({
-            data: {
-              productId,
-              name: variantInput.name,
-              sizeValue: variantInput.sizeValue,
-              sizeUnit: variantInput.sizeUnit,
-              isActive: variantInput.isActive ?? true,
-              sortOrder: variantInput.sortOrder ?? index,
-            },
-          });
+    const existingMap = new Map(existingVariants.map(v => [v.id, v]));
+    const submittedIds = new Set<string>();
 
-      for (const priceInput of variantInput.prices || []) {
-        const existingPrice = existingVariant?.prices.find(price => price.currencyCode === priceInput.currencyCode);
-        if (existingPrice) {
-          await this.prisma.price.update({
-            where: { id: existingPrice.id },
-            data: {
-              amount: priceInput.amount,
-              isActive: true,
-            },
-          });
-        } else {
+    for (const [index, variantInput] of variants.entries()) {
+      let variantId = (variantInput as any).id;
+      if (variantId && existingMap.has(variantId)) {
+        submittedIds.add(variantId);
+        const existingVariant = existingMap.get(variantId)!;
+        const variant = await this.prisma.productVariant.update({
+          where: { id: variantId },
+          data: {
+            name: variantInput.name,
+            sizeValue: variantInput.sizeValue,
+            sizeUnit: variantInput.sizeUnit,
+            isActive: variantInput.isActive ?? existingVariant.isActive,
+            sortOrder: variantInput.sortOrder ?? existingVariant.sortOrder,
+          },
+        });
+
+        for (const priceInput of variantInput.prices || []) {
+          const existingPrice = existingVariant.prices.find(p =>
+            (priceInput as any).id ? p.id === (priceInput as any).id : p.currencyCode === priceInput.currencyCode,
+          );
+          if (existingPrice) {
+            await this.prisma.price.update({
+              where: { id: existingPrice.id },
+              data: { amount: priceInput.amount, isActive: true },
+            });
+          } else {
+            await this.prisma.price.create({
+              data: { productVariantId: variant.id, currencyCode: priceInput.currencyCode, amount: priceInput.amount, isActive: true },
+            });
+          }
+        }
+      } else {
+        const variant = await this.prisma.productVariant.create({
+          data: {
+            productId,
+            name: variantInput.name,
+            sizeValue: variantInput.sizeValue,
+            sizeUnit: variantInput.sizeUnit,
+            isActive: variantInput.isActive ?? true,
+            sortOrder: variantInput.sortOrder ?? index,
+          },
+        });
+
+        for (const priceInput of variantInput.prices || []) {
           await this.prisma.price.create({
             data: {
               productVariantId: variant.id,
@@ -381,6 +463,15 @@ export class ProductsService {
             },
           });
         }
+      }
+    }
+
+    for (const existing of existingVariants) {
+      if (!submittedIds.has(existing.id)) {
+        await this.prisma.productVariant.update({
+          where: { id: existing.id },
+          data: { isActive: false },
+        });
       }
     }
   }

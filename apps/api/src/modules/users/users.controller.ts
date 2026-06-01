@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { z } from 'zod';
@@ -29,9 +29,15 @@ const updateUserStatusSchema = z.object({
   reason: z.string().max(500).optional(),
 });
 
+const resetPasswordSchema = z.object({
+  newPassword: z.string().min(8).optional(),
+  forceChangeOnNextLogin: z.boolean().optional(),
+});
+
 type UsersQuery = z.infer<typeof usersQuerySchema>;
 type UpdateUserRoleInput = z.infer<typeof updateUserRoleSchema>;
 type UpdateUserStatusInput = z.infer<typeof updateUserStatusSchema>;
+type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 
 @ApiTags('Users')
 @Controller('users')
@@ -63,6 +69,17 @@ export class UsersController {
   ) {
     const user = await this.usersService.updateRole(id, input.role, getAuditContext(req));
     return successResponse(user, 'User role updated');
+  }
+
+  @Post(':id/reset-password')
+  @Roles('admin')
+  async resetPassword(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(resetPasswordSchema)) input: ResetPasswordInput,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const result = await this.usersService.resetPassword(id, input.newPassword, input.forceChangeOnNextLogin, getAuditContext(req));
+    return successResponse(result, 'Password reset successfully');
   }
 
   @Patch(':id/status')

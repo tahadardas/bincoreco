@@ -63,6 +63,8 @@ const locales = ['ar', 'en'] as const;
 type Locale = (typeof locales)[number];
 const localeLabel: Record<Locale, string> = { ar: 'عربي', en: 'English' };
 
+const websiteUrl = process.env.NEXT_PUBLIC_WEBSITE_URL || (typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:3000` : 'http://localhost:3000');
+
 export default function AboutPageSettings() {
   const [values, setValues] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -111,13 +113,11 @@ export default function AboutPageSettings() {
     }
     try {
       for (const key of allKeys) {
-        const val = values[key];
-        if (val) {
-          await adminFetch(`/admin/settings/${key}`, {
-            method: 'PUT',
-            body: JSON.stringify({ value: val }),
-          });
-        }
+        const val = values[key] ?? '';
+        await adminFetch(`/admin/settings/${key}`, {
+          method: 'PUT',
+          body: JSON.stringify({ value: val }),
+        });
       }
       showToast('تم حفظ جميع الحقول ✅');
     } catch (err) {
@@ -140,6 +140,27 @@ export default function AboutPageSettings() {
         <div className="admin-actions-row">
           <button onClick={handleSave} disabled={saving} className="btn btn-primary">
             {saving ? 'جاري الحفظ...' : 'حفظ الكل'}
+          </button>
+          <a
+            href={`${websiteUrl}/ar/about`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn"
+            style={{ background: 'var(--br-espresso)', color: 'var(--br-gold-light)' }}
+          >
+            معاينة عربي
+          </a>
+          <a
+            href={`${websiteUrl}/en/about`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn"
+            style={{ background: 'var(--br-espresso)', color: 'var(--br-gold-light)' }}
+          >
+            Preview EN
+          </a>
+          <button onClick={() => { setLoading(true); window.location.reload(); }} className="btn" style={{ background: 'var(--br-cream)' }}>
+            إعادة تحميل من الموقع
           </button>
         </div>
       </div>

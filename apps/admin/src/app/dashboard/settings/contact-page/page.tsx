@@ -4,7 +4,7 @@ import { adminFetch } from '@/lib/api';
 
 interface Section {
   title: string;
-  fields: { key: string; label: string; long?: boolean }[];
+  fields: { key: string; label: string; long?: boolean; info?: string }[];
 }
 
 const sections: Section[] = [
@@ -26,13 +26,27 @@ const sections: Section[] = [
     title: 'الخريطة / Map',
     fields: [
       { key: 'contact_map_title', label: 'عنوان الخريطة' },
+      { key: 'contact_map_embed_url', label: 'رابط الخريطة المضمنة (iframe embed URL)' },
+      { key: 'contact_map_link', label: 'رابط الخريطة المفتوحة' },
+    ],
+  },
+  {
+    title: 'معلومات التواصل / Contact Info',
+    fields: [
+      { key: 'contact_phone', label: 'رقم الهاتف', info: 'قيمة مفردة (بدون لغة)' },
+      { key: 'contact_whatsapp', label: 'رقم الواتساب', info: 'قيمة مفردة' },
+      { key: 'contact_email', label: 'البريد الإلكتروني', info: 'قيمة مفردة' },
+      { key: 'contact_address', label: 'العنوان', info: 'قيمة لكل لغة' },
+      { key: 'contact_hours', label: 'ساعات العمل', info: 'قيمة لكل لغة' },
+      { key: 'contact_instagram', label: 'إنستغرام', info: 'قيمة مفردة' },
+      { key: 'contact_facebook', label: 'فيسبوك (اختياري)', info: 'قيمة مفردة' },
     ],
   },
   {
     title: 'دعوة لاتخاذ إجراء / CTA',
     fields: [
-      { key: 'contact_cta_order', label: 'زر \"اطلب\"' },
-      { key: 'contact_cta_whatsapp', label: 'زر \"واتساب\"' },
+      { key: 'contact_cta_order', label: 'زر "اطلب"' },
+      { key: 'contact_cta_whatsapp', label: 'زر "واتساب"' },
     ],
   },
 ];
@@ -41,6 +55,26 @@ const locales = ['ar', 'en'] as const;
 type Locale = (typeof locales)[number];
 
 const localeLabel: Record<Locale, string> = { ar: 'عربي', en: 'English' };
+
+const singleValueKeys = ['contact_phone', 'contact_whatsapp', 'contact_email', 'contact_instagram', 'contact_facebook', 'contact_map_embed_url', 'contact_map_link'];
+
+function getAllKeys(): string[] {
+  const keys: string[] = [];
+  for (const s of sections) {
+    for (const f of s.fields) {
+      if (singleValueKeys.includes(f.key)) {
+        keys.push(f.key);
+      } else {
+        for (const loc of locales) {
+          keys.push(`${f.key}_${loc}`);
+        }
+      }
+    }
+  }
+  return keys;
+}
+
+const websiteUrl = process.env.NEXT_PUBLIC_WEBSITE_URL || (typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:3000` : 'http://localhost:3000');
 
 export default function ContactPageSettings() {
   const [values, setValues] = useState<Record<string, string>>({});
@@ -59,13 +93,8 @@ export default function ContactPageSettings() {
     adminFetch<Record<string, string>>('/admin/settings')
       .then(data => {
         const filtered: Record<string, string> = {};
-        for (const s of sections) {
-          for (const f of s.fields) {
-            for (const loc of locales) {
-              const key = `${f.key}_${loc}`;
-              if (data[key]) filtered[key] = data[key];
-            }
-          }
+        for (const key of getAllKeys()) {
+          if (data[key]) filtered[key] = data[key];
         }
         setValues(filtered);
       })
@@ -80,23 +109,13 @@ export default function ContactPageSettings() {
   const handleSave = async () => {
     setSaving(true);
     setError(null);
-    const allKeys: string[] = [];
-    for (const s of sections) {
-      for (const f of s.fields) {
-        for (const loc of locales) {
-          allKeys.push(`${f.key}_${loc}`);
-        }
-      }
-    }
     try {
-      for (const key of allKeys) {
-        const val = values[key];
-        if (val) {
-          await adminFetch(`/admin/settings/${key}`, {
-            method: 'PUT',
-            body: JSON.stringify({ value: val }),
-          });
-        }
+      for (const key of getAllKeys()) {
+        const val = values[key] ?? '';
+        await adminFetch(`/admin/settings/${key}`, {
+          method: 'PUT',
+          body: JSON.stringify({ value: val }),
+        });
       }
       showToast('تم حفظ جميع الحقول ✅');
     } catch (err) {
@@ -114,12 +133,14 @@ export default function ContactPageSettings() {
       <div className="admin-page-header">
         <div>
           <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 6 }}>صفحة اتصل بنا</h1>
-          <p style={{ color: 'var(--br-muted)', fontSize: 14 }}>تعديل نصوص صفحة \"اتصل بنا\" في الموقع. معلومات التواصل (الهاتف، الواتساب، العنوان) تُعدّل من صفحة <a href="/dashboard/settings/brand" style={{ color: 'var(--br-gold)', textDecoration: 'underline' }}>العلامة التجارية</a>.</p>
+          <p style={{ color: 'var(--br-muted)', fontSize: 14 }}>تعديل نصوص ومعلومات صفحة "اتصل بنا" في الموقع. معلومات التواصل أصبحت هنا بالكامل.</p>
         </div>
         <div className="admin-actions-row">
           <button onClick={handleSave} disabled={saving} className="btn btn-primary">
             {saving ? 'جاري الحفظ...' : 'حفظ الكل'}
           </button>
+          <a href={`${websiteUrl}/ar/contact`} target="_blank" rel="noopener noreferrer" className="btn" style={{ background: 'var(--br-espresso)', color: 'var(--br-gold-light)' }}>معاينة عربي</a>
+          <a href={`${websiteUrl}/en/contact`} target="_blank" rel="noopener noreferrer" className="btn" style={{ background: 'var(--br-espresso)', color: 'var(--br-gold-light)' }}>Preview EN</a>
         </div>
       </div>
 
@@ -132,30 +153,48 @@ export default function ContactPageSettings() {
           <div style={{ display: 'grid', gap: 24 }}>
             {section.fields.map(field => (
               <div key={field.key}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  {locales.map(loc => (
-                    <div key={loc}>
-                      <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4, color: 'var(--br-muted)' }}>
-                        {field.label} — {localeLabel[loc]}
-                      </label>
-                      {field.long ? (
-                        <textarea
-                          className="input"
-                          style={{ minHeight: 90, resize: 'vertical', width: '100%' }}
-                          value={values[`${field.key}_${loc}`] || ''}
-                          onChange={e => setVal(`${field.key}_${loc}`, e.target.value)}
-                        />
-                      ) : (
-                        <input
-                          className="input"
-                          style={{ width: '100%' }}
-                          value={values[`${field.key}_${loc}`] || ''}
-                          onChange={e => setVal(`${field.key}_${loc}`, e.target.value)}
-                        />
-                      )}
+                {singleValueKeys.includes(field.key) ? (
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4, color: 'var(--br-muted)' }}>
+                      {field.label}
+                    </label>
+                    {field.info && <div style={{ fontSize: 11, color: 'var(--br-muted)', marginBottom: 6 }}>{field.info}</div>}
+                    <input
+                      className="input"
+                      style={{ width: '100%' }}
+                      value={values[field.key] || ''}
+                      onChange={e => setVal(field.key, e.target.value)}
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                      {locales.map(loc => (
+                        <div key={loc}>
+                          <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4, color: 'var(--br-muted)' }}>
+                            {field.label} — {localeLabel[loc]}
+                          </label>
+                          {field.info && <div style={{ fontSize: 11, color: 'var(--br-muted)', marginBottom: 6 }}>{field.info}</div>}
+                          {field.long ? (
+                            <textarea
+                              className="input"
+                              style={{ minHeight: 90, resize: 'vertical', width: '100%' }}
+                              value={values[`${field.key}_${loc}`] || ''}
+                              onChange={e => setVal(`${field.key}_${loc}`, e.target.value)}
+                            />
+                          ) : (
+                            <input
+                              className="input"
+                              style={{ width: '100%' }}
+                              value={values[`${field.key}_${loc}`] || ''}
+                              onChange={e => setVal(`${field.key}_${loc}`, e.target.value)}
+                            />
+                          )}
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>

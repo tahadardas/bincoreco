@@ -37,6 +37,20 @@ async function main() {
   });
   console.log('Customer user created:', customer.email);
 
+  const currencies = [
+    { code: 'SYP', name: 'Syrian Pound', nameAr: 'ليرة سورية', nameEn: 'Syrian Pound', symbol: 'ل.س', isDefault: true, isActive: true, sortOrder: 0 },
+    { code: 'USD', name: 'US Dollar', nameAr: 'دولار أمريكي', nameEn: 'US Dollar', symbol: '$', isDefault: false, isActive: true, sortOrder: 1 },
+  ];
+
+  for (const currency of currencies) {
+    await prisma.currency.upsert({
+      where: { code: currency.code },
+      update: {},
+      create: currency,
+    });
+  }
+  console.log('Currencies created');
+
   const categories = [
     { slug: 'hot-drinks', translations: [{ locale: 'ar', name: 'مشروبات ساخنة', description: 'مشروبات ساخنة مميزة' }, { locale: 'en', name: 'Hot Drinks', description: 'Signature hot drinks' }] },
     { slug: 'cold-drinks', translations: [{ locale: 'ar', name: 'مشروبات باردة', description: 'مشروبات باردة منعشة' }, { locale: 'en', name: 'Cold Drinks', description: 'Refreshing cold drinks' }] },

@@ -55,13 +55,19 @@ export class SettingsService {
       'brand_pattern',
       'brand_footer_logo',
       'brand_pattern_opacity',
-      'contact_phone',
-      'contact_whatsapp',
-      'contact_address',
-      'contact_hours',
-      'contact_instagram',
-      'contact_email',
     ];
+    const keys = await this.prisma.setting.findMany({
+      where: { key: { in: allowedKeys } },
+    });
+    const result: Record<string, string | null> = {};
+    for (const key of allowedKeys) {
+      const found = keys.find(s => s.key === key);
+      result[key] = found?.value ?? null;
+    }
+    return result;
+  }
+
+  async getPublicContentSettings(): Promise<Record<string, string | null>> {
     const aboutKeys = [
       'about_hero_title', 'about_hero_sub',
       'about_story_title', 'about_story_p1', 'about_story_p2',
@@ -71,22 +77,34 @@ export class SettingsService {
       'about_cta_title', 'about_cta_sub',
       'about_order_now', 'about_view_products',
     ];
-    for (const k of aboutKeys) {
-      allowedKeys.push(`${k}_ar`, `${k}_en`);
-    }
-    const contactKeys = [
+    const contactContentKeys = [
       'contact_hero_title', 'contact_hero_sub',
       'contact_form_title', 'contact_map_title',
-      'contact_success_msg', 'contact_cta_order', 'contact_cta_whatsapp',
+      'contact_success_msg',
+      'contact_cta_order', 'contact_cta_whatsapp',
+      'contact_map_embed_url', 'contact_map_link',
     ];
-    for (const k of contactKeys) {
-      allowedKeys.push(`${k}_ar`, `${k}_en`);
+    const contactInfoKeys = [
+      'contact_phone', 'contact_whatsapp', 'contact_email',
+      'contact_address_ar', 'contact_address_en',
+      'contact_hours_ar', 'contact_hours_en',
+      'contact_instagram', 'contact_facebook',
+    ];
+    const allKeys: string[] = [];
+    for (const k of aboutKeys) {
+      allKeys.push(`${k}_ar`, `${k}_en`);
+    }
+    for (const k of contactContentKeys) {
+      allKeys.push(`${k}_ar`, `${k}_en`);
+    }
+    for (const k of contactInfoKeys) {
+      allKeys.push(k);
     }
     const keys = await this.prisma.setting.findMany({
-      where: { key: { in: allowedKeys } },
+      where: { key: { in: allKeys } },
     });
     const result: Record<string, string | null> = {};
-    for (const key of allowedKeys) {
+    for (const key of allKeys) {
       const found = keys.find(s => s.key === key);
       result[key] = found?.value ?? null;
     }

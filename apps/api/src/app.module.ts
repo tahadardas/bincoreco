@@ -19,6 +19,8 @@ import { MediaModule } from './modules/media/media.module';
 import { LoyaltyModule } from './modules/loyalty/loyalty.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
 import { ContactMessagesModule } from './modules/contact-messages/contact-messages.module';
+import { CurrenciesModule } from './modules/currencies/currencies.module';
+import { ProductSizeOptionsModule } from './modules/product-size-options/product-size-options.module';
 
 @Module({
   imports: [
@@ -41,6 +43,8 @@ import { ContactMessagesModule } from './modules/contact-messages/contact-messag
     LoyaltyModule,
     ReviewsModule,
     ContactMessagesModule,
+    CurrenciesModule,
+    ProductSizeOptionsModule,
   ],
   providers: [
     {

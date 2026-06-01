@@ -5,16 +5,18 @@ import { PrismaService } from '../prisma/prisma.service';
 export class BannersService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(locale?: string) {
+  async findAll(locale?: string, placement?: string) {
     const now = new Date();
+    const where: any = {
+      isActive: true,
+      AND: [
+        { OR: [{ startsAt: null }, { startsAt: { lte: now } }] },
+        { OR: [{ endsAt: null }, { endsAt: { gte: now } }] },
+      ],
+    };
+    if (placement) where.placement = placement;
     return this.prisma.banner.findMany({
-      where: {
-        isActive: true,
-        AND: [
-          { OR: [{ startsAt: null }, { startsAt: { lte: now } }] },
-          { OR: [{ endsAt: null }, { endsAt: { gte: now } }] },
-        ],
-      },
+      where,
       include: {
         translations: locale ? { where: { locale } } : true,
       },
@@ -39,6 +41,7 @@ export class BannersService {
   }
 
   async create(data: {
+    placement?: string;
     imageUrl: string;
     mobileImageUrl?: string;
     linkUrl?: string;
@@ -58,6 +61,7 @@ export class BannersService {
   }) {
     return this.prisma.banner.create({
       data: {
+        placement: data.placement as any ?? 'HOME_PROMO',
         imageUrl: data.imageUrl,
         mobileImageUrl: data.mobileImageUrl,
         linkUrl: data.linkUrl,
@@ -82,6 +86,7 @@ export class BannersService {
   }
 
   async update(id: string, data: {
+    placement?: string;
     imageUrl?: string;
     mobileImageUrl?: string;
     linkUrl?: string;
@@ -110,6 +115,7 @@ export class BannersService {
       }
     }
     const updateData: any = {};
+    if (data.placement !== undefined) updateData.placement = data.placement;
     if (data.imageUrl !== undefined) updateData.imageUrl = data.imageUrl;
     if (data.mobileImageUrl !== undefined) updateData.mobileImageUrl = data.mobileImageUrl;
     if (data.linkUrl !== undefined) updateData.linkUrl = data.linkUrl;

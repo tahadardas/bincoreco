@@ -1,8 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppRole } from '../../common/auth/roles.decorator';
 import { AuditActions, AuditLogContext } from '../audit-logs/audit-log.types';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import * as bcrypt from 'bcryptjs';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class UsersService {
@@ -117,6 +119,46 @@ export class UsersService {
     return after;
   }
 
+  async resetPassword(id: string, newPassword?: string, forceChangeOnNextLogin?: boolean, auditContext?: AuditLogContext) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException('User not found');
+
+    let password = newPassword;
+    let generated = false;
+    if (!password) {
+      password = crypto.randomBytes(4).toString('hex') + '@A1';
+      generated = true;
+    }
+
+    if (password.length < 8) {
+      throw new BadRequestException('كلمة المرور يجب أن تكون 8 أحرف على الأقل');
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    await this.prisma.user.update({
+      where: { id },
+      data: {
+        passwordHash,
+        mustChangePassword: forceChangeOnNextLogin ?? false,
+        passwordUpdatedAt: new Date(),
+      },
+    });
+
+    await this.auditLogs.record({
+      ...auditContext,
+      action: AuditActions.USER_PASSWORD_RESET,
+      entityType: 'User',
+      entityId: id,
+      afterSnapshot: { resetAt: new Date().toISOString(), forceChange: forceChangeOnNextLogin },
+    });
+
+    if (generated) {
+      return { message: 'Password reset successfully', temporaryPassword: password, generated: true };
+    }
+    return { message: 'Password reset successfully', generated: false };
+  }
+
   async findAll(params: { page?: number; limit?: number; search?: string; role?: string; isActive?: boolean; fromDate?: string; toDate?: string }) {
     const page = params.page || 1;
     const limit = params.limit || 20;
@@ -145,7 +187,7 @@ export class UsersService {
         take: limit,
         orderBy: { createdAt: 'desc' },
         select: {
-          id: true, email: true, phone: true, fullName: true, role: true, isActive: true, createdAt: true, updatedAt: true,
+        id: true, email: true, phone: true, fullName: true, role: true, isActive: true, mustChangePassword: true, createdAt: true, updatedAt: true,
           _count: { select: { orders: true } },
           customerProfile: { select: { loyaltyAccount: { select: { balance: true } } } },
         },

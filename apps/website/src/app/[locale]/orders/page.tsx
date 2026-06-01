@@ -5,6 +5,7 @@ import { api } from '@/lib/api';
 import { getDictionary, Locale } from '@/lib/dictionaries';
 import { useAuth } from '@/lib/auth-context';
 import { formatMoney, MoneyAmount } from '@/lib/money';
+import { useCurrency } from '@/lib/currency-context';
 import EspressoButton from '@/components/espresso-button';
 
 interface OrderItem {
@@ -101,6 +102,7 @@ export default function OrdersPage() {
   const locale = (params.locale as Locale) || 'ar';
   const dict = getDictionary(locale);
   const { user, token } = useAuth();
+  const { selectedCurrency } = useCurrency();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -166,7 +168,7 @@ export default function OrdersPage() {
                   <strong>{item.productNameSnapshot}</strong> x{item.quantity}
                   {details && <span style={{ color: 'var(--br-muted)' }}> · {details}</span>}
                 </span>
-                <span>{formatMoney(item.total, item.currencyCode || order.currencyCode || 'SYP')}</span>
+                <span>{formatMoney(item.total, selectedCurrency || 'SYP')}</span>
               </div>
             );
           })}
@@ -174,7 +176,7 @@ export default function OrdersPage() {
 
         <div style={{ borderTop: '1px solid var(--br-line)', marginTop: 12, paddingTop: 12, display: 'flex', justifyContent: 'space-between', fontWeight: 900 }}>
           <span>{dict.order.total}</span>
-          <span className="money">{formatMoney(order.total, order.currencyCode || 'SYP')}</span>
+          <span className="money">{formatMoney(order.total, selectedCurrency || 'SYP')}</span>
         </div>
         <div style={{ fontSize: 13, color: 'var(--br-muted)', marginTop: 8 }}>
           {dict.order.pickupTime}: {formatDate(order.pickupTime, locale)}

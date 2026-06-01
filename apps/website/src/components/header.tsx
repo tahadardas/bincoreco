@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { getDictionary, Locale } from '@/lib/dictionaries';
+import CurrencySwitcher from '@/components/currency-switcher';
 
 type HeaderProps = {
   brandMark?: string;
@@ -36,6 +37,7 @@ export default function Header({ brandMark }: HeaderProps) {
           <Link href={`/${locale}/cart`}>{dict.nav.cart}</Link>
           {user && <Link href={`/${locale}/orders`}>{dict.nav.orders}</Link>}
           {user && <Link href={`/${locale}/loyalty`}>{dict.nav.loyalty}</Link>}
+          <CurrencySwitcher />
           <Link href={`/${locale === 'ar' ? 'en' : 'ar'}`} className="lang-switch">
             {locale === 'ar' ? 'EN' : 'AR'}
           </Link>

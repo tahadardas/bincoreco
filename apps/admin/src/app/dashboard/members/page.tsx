@@ -93,6 +93,11 @@ export default function MembersPage() {
   const [roleSaving, setRoleSaving] = useState(false);
   const [statusConfirm, setStatusConfirm] = useState<{ user: User } | null>(null);
   const [statusSaving, setStatusSaving] = useState(false);
+  const [resetPwdModal, setResetPwdModal] = useState<{ user: User } | null>(null);
+  const [resetPwdMode, setResetPwdMode] = useState<'auto' | 'manual'>('auto');
+  const [manualPassword, setManualPassword] = useState('');
+  const [resetPwdSaving, setResetPwdSaving] = useState(false);
+  const [tempPassword, setTempPassword] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
@@ -276,6 +281,13 @@ export default function MembersPage() {
             }}
           >
             {updatingId === user.id ? '...' : user.isActive ? 'تعطيل' : 'تفعيل'}
+          </button>
+          <button
+            onClick={() => { setResetPwdModal({ user }); setResetPwdMode('auto'); setManualPassword(''); setTempPassword(null); }}
+            className="btn btn-sm"
+            style={{ background: 'var(--br-gold)', color: 'var(--br-black)' }}
+          >
+            إعادة تعيين كلمة المرور
           </button>
         </div>
       ),
@@ -536,6 +548,130 @@ export default function MembersPage() {
                 إلغاء
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {resetPwdModal && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1001,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', direction: 'rtl',
+          }}
+          onClick={() => { if (!tempPassword) setResetPwdModal(null); }}
+        >
+          <div
+            className="card"
+            style={{ width: 420, padding: 24 }}
+            onClick={event => event.stopPropagation()}
+          >
+            <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>
+              إعادة تعيين كلمة مرور {resetPwdModal.user.fullName}
+            </h3>
+            <p style={{ color: 'var(--br-muted)', fontSize: 14, marginBottom: 16 }}>
+              {tempPassword
+                ? 'كلمة المرور المؤقتة أدناه. لن تظهر مرة أخرى.'
+                : 'اختر طريقة إعادة تعيين كلمة المرور.'}
+            </p>
+
+            {tempPassword ? (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{
+                  background: 'var(--br-gold)', color: 'var(--br-black)',
+                  padding: 16, borderRadius: 8, textAlign: 'center',
+                  fontSize: 22, fontWeight: 900, fontFamily: 'monospace',
+                  letterSpacing: 2, marginBottom: 12,
+                  direction: 'ltr',
+                }}>
+                  {tempPassword}
+                </div>
+                <button
+                  className="btn btn-sm btn-primary"
+                  style={{ width: '100%', marginBottom: 8 }}
+                  onClick={() => { navigator.clipboard.writeText(tempPassword); showToast('تم النسخ ✅'); }}
+                >
+                  نسخ كلمة المرور
+                </button>
+                <div style={{ color: 'var(--br-danger)', fontSize: 13, fontWeight: 700, textAlign: 'center' }}>
+                  ⚠️ لن تظهر هذه الكلمة مرة أخرى.
+                </div>
+              </div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                  <button
+                    onClick={() => setResetPwdMode('auto')}
+                    className="btn btn-sm"
+                    style={{
+                      flex: 1,
+                      background: resetPwdMode === 'auto' ? 'var(--br-gold)' : 'var(--br-cream)',
+                      color: resetPwdMode === 'auto' ? 'var(--br-black)' : 'var(--br-coffee)',
+                    }}
+                  >
+                    توليد كلمة تلقائياً
+                  </button>
+                  <button
+                    onClick={() => setResetPwdMode('manual')}
+                    className="btn btn-sm"
+                    style={{
+                      flex: 1,
+                      background: resetPwdMode === 'manual' ? 'var(--br-gold)' : 'var(--br-cream)',
+                      color: resetPwdMode === 'manual' ? 'var(--br-black)' : 'var(--br-coffee)',
+                    }}
+                  >
+                    تعيين كلمة يدوياً
+                  </button>
+                </div>
+
+                {resetPwdMode === 'manual' && (
+                  <input
+                    className="input"
+                    type="password"
+                    placeholder="كلمة المرور الجديدة (8 أحرف على الأقل)"
+                    style={{ width: '100%', marginBottom: 16 }}
+                    value={manualPassword}
+                    onChange={event => setManualPassword(event.target.value)}
+                  />
+                )}
+
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    onClick={async () => {
+                      setResetPwdSaving(true);
+                      try {
+                        const body: any = { forceChangeOnNextLogin: true };
+                        if (resetPwdMode === 'manual') body.newPassword = manualPassword;
+                        const result = await adminFetch<any>(`/users/${resetPwdModal.user.id}/reset-password`, {
+                          method: 'POST',
+                          body: JSON.stringify(body),
+                        });
+                        if (result.temporaryPassword) {
+                          setTempPassword(result.temporaryPassword);
+                        } else {
+                          showToast('تم إعادة تعيين كلمة المرور بنجاح ✅');
+                          setResetPwdModal(null);
+                        }
+                      } catch (err) {
+                        showToast(err instanceof Error ? err.message : 'فشل إعادة التعيين', 'error');
+                      } finally {
+                        setResetPwdSaving(false);
+                      }
+                    }}
+                    disabled={resetPwdSaving || (resetPwdMode === 'manual' && manualPassword.length < 8)}
+                    className="btn btn-sm btn-primary"
+                  >
+                    {resetPwdSaving ? 'جاري...' : 'تأكيد إعادة التعيين'}
+                  </button>
+                  <button
+                    onClick={() => setResetPwdModal(null)}
+                    className="btn btn-sm"
+                    style={{ background: 'var(--br-cream)' }}
+                  >
+                    إلغاء
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

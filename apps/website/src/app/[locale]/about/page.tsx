@@ -29,12 +29,12 @@ export default function AboutPage() {
   const [content, setContent] = useState<AboutContent>({});
 
   useEffect(() => {
-    api.get<Record<string, string | null>>('/settings/public-brand').then(data => {
+    api.get<Record<string, string | null>>('/settings/public-content').then(data => {
       if (!data) return;
       const c: AboutContent = {};
       for (const f of aboutFields) {
         const val = data[`about_${f}_${locale}`];
-        if (val) c[f] = val;
+        c[f] = val || '';
       }
       setContent(c);
     }).catch(() => {});

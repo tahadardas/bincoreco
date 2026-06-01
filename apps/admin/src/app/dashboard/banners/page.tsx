@@ -27,6 +27,7 @@ interface Banner {
   endsAt?: string | null;
   sortOrder: number;
   isActive: boolean;
+  placement?: string | null;
   translations: BannerTranslation[];
 }
 
@@ -39,6 +40,7 @@ interface BannerForm {
   ctaUrl: string;
   animationType: string;
   displayMode: string;
+  placement: string;
   overlayOpacity: number;
   textPosition: string;
   textColor: string;
@@ -61,6 +63,7 @@ const emptyForm: BannerForm = {
   ctaUrl: '',
   animationType: 'fade',
   displayMode: 'fullWidthHero',
+  placement: 'HOME_PROMO',
   overlayOpacity: 0.35,
   textPosition: 'center',
   textColor: 'light',
@@ -93,6 +96,22 @@ const displayModeOptions = [
   { value: 'backgroundWithOverlay', label: 'Background with Overlay' },
 ];
 
+const placementOptions = [
+  { value: 'HOME_PROMO', label: 'بانر ترويجي داخل الصفحة' },
+  { value: 'HOME_HERO', label: 'خلفية الهيرو تحت الهيدر' },
+];
+
+const placementFilterOptions = [
+  { value: 'all', label: 'جميع المواضع' },
+  { value: 'HOME_HERO', label: 'خلفية الهيرو تحت الهيدر' },
+  { value: 'HOME_PROMO', label: 'بانر ترويجي داخل الصفحة' },
+];
+
+function placementLabel(placement?: string | null) {
+  const opt = placementOptions.find(o => o.value === placement);
+  return opt ? opt.label : '-';
+}
+
 function translation(banner: Banner, locale: 'ar' | 'en') {
   return banner.translations.find(item => item.locale === locale);
 }
@@ -106,6 +125,7 @@ export default function BannersPage() {
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'hidden'>('all');
+  const [placementFilter, setPlacementFilter] = useState<string>('all');
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
@@ -119,9 +139,10 @@ export default function BannersPage() {
       const matchesStatus = statusFilter === 'all'
         || (statusFilter === 'active' && banner.isActive)
         || (statusFilter === 'hidden' && !banner.isActive);
-      return matchesSearch && matchesStatus;
+      const matchesPlacement = placementFilter === 'all' || banner.placement === placementFilter;
+      return matchesSearch && matchesStatus && matchesPlacement;
     });
-  }, [banners, search, statusFilter]);
+  }, [banners, search, statusFilter, placementFilter]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -162,6 +183,7 @@ export default function BannersPage() {
         ctaUrl: form.ctaUrl.trim() || undefined,
         animationType: form.animationType || 'fade',
         displayMode: form.displayMode || 'fullWidthHero',
+        placement: form.placement || undefined,
         overlayOpacity: form.overlayOpacity,
         textPosition: form.textPosition || 'center',
         textColor: form.textColor || 'light',
@@ -201,6 +223,7 @@ export default function BannersPage() {
       ctaUrl: banner.ctaUrl || '',
       animationType: banner.animationType || 'fade',
       displayMode: banner.displayMode || 'fullWidthHero',
+      placement: banner.placement || 'HOME_PROMO',
       overlayOpacity: banner.overlayOpacity ?? 0.35,
       textPosition: banner.textPosition || 'center',
       textColor: banner.textColor || 'light',
@@ -245,6 +268,7 @@ export default function BannersPage() {
   const previewTitle = form.titleAr || form.titleEn;
   const previewImg = resolveMediaUrl(form.imageUrl);
   const previewMobileImg = resolveMediaUrl(form.mobileImageUrl || form.imageUrl);
+  const isHeroPreview = form.placement === 'HOME_HERO';
 
   return (
     <div dir="rtl">
@@ -287,6 +311,14 @@ export default function BannersPage() {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 16 }}>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>مكان الظهور</div>
+            <select className="input" value={form.placement} onChange={event => setForm({ ...form, placement: event.target.value })}>
+              {placementOptions.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
           <div>
             <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>نوع الحركة</div>
             <select className="input" value={form.animationType} onChange={event => setForm({ ...form, animationType: event.target.value })}>
@@ -372,55 +404,159 @@ export default function BannersPage() {
         {showPreview && (form.imageUrl || previewTitle) && (
           <div style={{ marginTop: 20, borderRadius: 12, overflow: 'hidden', border: '1px solid var(--br-line)' }}>
             <div style={{ fontWeight: 700, fontSize: 14, padding: '8px 14px', background: 'var(--br-cream)', borderBottom: '1px solid var(--br-line)' }}>
-              معاينة البنر
+              {isHeroPreview ? 'معاينة خلفية الهيرو' : 'معاينة البنر'}
             </div>
-            <div
-              style={{
-                position: 'relative',
-                width: '100%',
-                height: 320,
-                background: form.imageUrl ? `url(${previewImg}) center/cover no-repeat` : 'var(--br-espresso)',
-                display: 'flex',
-                alignItems: form.textPosition === 'bottom' ? 'flex-end' : form.textPosition === 'center' ? 'center' : form.textPosition === 'left' ? 'flex-start' : 'flex-start',
-                justifyContent: 'center',
-              }}
-            >
-              {form.imageUrl && (
-                <div style={{ position: 'absolute', inset: 0, background: `rgba(0,0,0,${form.overlayOpacity || 0.35})`, zIndex: 1 }} />
-              )}
-              <div style={{
-                position: 'relative', zIndex: 2, padding: 32, textAlign: 'center',
-                color: form.textColor === 'dark' ? '#000' : '#fff',
-                direction: 'rtl',
-              }}>
-                {previewTitle && (
-                  <h2 style={{ fontSize: 28, fontWeight: 900, marginBottom: 8, textShadow: form.textColor === 'dark' ? 'none' : '0 2px 10px rgba(0,0,0,0.3)', color: form.textColor === 'dark' ? '#000' : 'var(--br-gold-light)' }}>
-                    {previewTitle}
-                  </h2>
-                )}
-                {form.subtitleAr && (
-                  <p style={{ fontSize: 15, opacity: 0.85, maxWidth: 500, margin: '0 auto' }}>
-                    {form.subtitleAr}
-                  </p>
-                )}
-                {(form.ctaTextAr || form.ctaTextEn) && (
-                  <div style={{ marginTop: 16 }}>
-                    <span style={{
-                      display: 'inline-block',
-                      padding: '10px 24px',
-                      borderRadius: 999,
-                      background: 'var(--br-gold)',
-                      color: '#000',
-                      fontWeight: 700,
-                      fontSize: 14,
+            {isHeroPreview ? (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0 }}>
+                <div>
+                  <div style={{ fontSize: 11, padding: '4px 10px', background: 'var(--br-cream)', borderBottom: '1px solid var(--br-line)', fontWeight: 600 }}>سطح المكتب</div>
+                  <div
+                    style={{
+                      position: 'relative',
+                      width: '100%',
+                      height: 320,
+                      background: form.imageUrl ? `url(${previewImg}) center/cover no-repeat` : 'var(--br-espresso)',
+                      display: 'flex',
+                      alignItems: form.textPosition === 'bottom' ? 'flex-end' : form.textPosition === 'center' ? 'center' : 'flex-start',
+                      justifyContent: form.textPosition === 'left' ? 'flex-start' : form.textPosition === 'right' ? 'flex-end' : 'center',
+                    }}
+                  >
+                    {form.imageUrl && (
+                      <div style={{ position: 'absolute', inset: 0, background: `rgba(0,0,0,${form.overlayOpacity || 0.35})`, zIndex: 1 }} />
+                    )}
+                    <div style={{
+                      position: 'relative', zIndex: 2, padding: 32, textAlign: 'center',
+                      color: form.textColor === 'dark' ? '#000' : '#fff',
+                      direction: 'rtl',
                     }}>
-                      {form.ctaTextAr || form.ctaTextEn}
-                    </span>
+                      {previewTitle && (
+                        <h2 style={{ fontSize: 28, fontWeight: 900, marginBottom: 8, textShadow: form.textColor === 'dark' ? 'none' : '0 2px 10px rgba(0,0,0,0.3)', color: form.textColor === 'dark' ? '#000' : 'var(--br-gold-light)' }}>
+                          {previewTitle}
+                        </h2>
+                      )}
+                      {form.subtitleAr && (
+                        <p style={{ fontSize: 15, opacity: 0.85, maxWidth: 500, margin: '0 auto' }}>
+                          {form.subtitleAr}
+                        </p>
+                      )}
+                      {(form.ctaTextAr || form.ctaTextEn) && (
+                        <div style={{ marginTop: 16 }}>
+                          <span style={{
+                            display: 'inline-block',
+                            padding: '10px 24px',
+                            borderRadius: 999,
+                            background: 'var(--br-gold)',
+                            color: '#000',
+                            fontWeight: 700,
+                            fontSize: 14,
+                          }}>
+                            {form.ctaTextAr || form.ctaTextEn}
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                )}
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, padding: '4px 10px', background: 'var(--br-cream)', borderBottom: '1px solid var(--br-line)', fontWeight: 600 }}>الجوال</div>
+                  <div
+                    style={{
+                      position: 'relative',
+                      width: '100%',
+                      height: 320,
+                      background: `url(${previewMobileImg}) center/cover no-repeat`,
+                      display: 'flex',
+                      alignItems: form.textPosition === 'bottom' ? 'flex-end' : form.textPosition === 'center' ? 'center' : 'flex-start',
+                      justifyContent: form.textPosition === 'left' ? 'flex-start' : form.textPosition === 'right' ? 'flex-end' : 'center',
+                    }}
+                  >
+                    {form.mobileImageUrl && (
+                      <div style={{ position: 'absolute', inset: 0, background: `rgba(0,0,0,${form.overlayOpacity || 0.35})`, zIndex: 1 }} />
+                    )}
+                    <div style={{
+                      position: 'relative', zIndex: 2, padding: 24, textAlign: 'center',
+                      color: form.textColor === 'dark' ? '#000' : '#fff',
+                      direction: 'rtl',
+                    }}>
+                      {previewTitle && (
+                        <h2 style={{ fontSize: 20, fontWeight: 900, marginBottom: 6, textShadow: form.textColor === 'dark' ? 'none' : '0 2px 10px rgba(0,0,0,0.3)', color: form.textColor === 'dark' ? '#000' : 'var(--br-gold-light)' }}>
+                          {previewTitle}
+                        </h2>
+                      )}
+                      {form.subtitleAr && (
+                        <p style={{ fontSize: 13, opacity: 0.85, maxWidth: 400, margin: '0 auto' }}>
+                          {form.subtitleAr}
+                        </p>
+                      )}
+                      {(form.ctaTextAr || form.ctaTextEn) && (
+                        <div style={{ marginTop: 12 }}>
+                          <span style={{
+                            display: 'inline-block',
+                            padding: '8px 20px',
+                            borderRadius: 999,
+                            background: 'var(--br-gold)',
+                            color: '#000',
+                            fontWeight: 700,
+                            fontSize: 13,
+                          }}>
+                            {form.ctaTextAr || form.ctaTextEn}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div
+                style={{
+                  position: 'relative',
+                  width: '100%',
+                  height: 320,
+                  background: form.imageUrl ? `url(${previewImg}) center/cover no-repeat` : 'var(--br-espresso)',
+                  display: 'flex',
+                  alignItems: form.textPosition === 'bottom' ? 'flex-end' : form.textPosition === 'center' ? 'center' : 'flex-start',
+                  justifyContent: form.textPosition === 'left' ? 'flex-start' : form.textPosition === 'right' ? 'flex-end' : 'center',
+                }}
+              >
+                {form.imageUrl && (
+                  <div style={{ position: 'absolute', inset: 0, background: `rgba(0,0,0,${form.overlayOpacity || 0.35})`, zIndex: 1 }} />
+                )}
+                <div style={{
+                  position: 'relative', zIndex: 2, padding: 32, textAlign: 'center',
+                  color: form.textColor === 'dark' ? '#000' : '#fff',
+                  direction: 'rtl',
+                }}>
+                  {previewTitle && (
+                    <h2 style={{ fontSize: 28, fontWeight: 900, marginBottom: 8, textShadow: form.textColor === 'dark' ? 'none' : '0 2px 10px rgba(0,0,0,0.3)', color: form.textColor === 'dark' ? '#000' : 'var(--br-gold-light)' }}>
+                      {previewTitle}
+                    </h2>
+                  )}
+                  {form.subtitleAr && (
+                    <p style={{ fontSize: 15, opacity: 0.85, maxWidth: 500, margin: '0 auto' }}>
+                      {form.subtitleAr}
+                    </p>
+                  )}
+                  {(form.ctaTextAr || form.ctaTextEn) && (
+                    <div style={{ marginTop: 16 }}>
+                      <span style={{
+                        display: 'inline-block',
+                        padding: '10px 24px',
+                        borderRadius: 999,
+                        background: 'var(--br-gold)',
+                        color: '#000',
+                        fontWeight: 700,
+                        fontSize: 14,
+                      }}>
+                        {form.ctaTextAr || form.ctaTextEn}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
             <div style={{ padding: '8px 14px', display: 'flex', gap: 12, fontSize: 12, color: 'var(--br-muted)', borderTop: '1px solid var(--br-line)' }}>
+              <span>المكان: {placementLabel(form.placement)}</span>
               <span>الحركة: {form.animationType}</span>
               <span>العتامة: {form.overlayOpacity}</span>
               <span>موضع النص: {form.textPosition}</span>
@@ -431,12 +567,17 @@ export default function BannersPage() {
       </div>
 
       <div className="card" style={{ marginBottom: 20, padding: 16 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 1fr) 180px', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(160px, 1fr) 160px 160px', gap: 12 }}>
           <input className="input" placeholder="بحث بالعنوان أو رابط الصورة" value={search} onChange={event => setSearch(event.target.value)} />
           <select className="input" value={statusFilter} onChange={event => setStatusFilter(event.target.value as 'all' | 'active' | 'hidden')}>
             <option value="all">كل الحالات</option>
             <option value="active">نشط فقط</option>
             <option value="hidden">مخفي فقط</option>
+          </select>
+          <select className="input" value={placementFilter} onChange={event => setPlacementFilter(event.target.value)}>
+            {placementFilterOptions.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
           </select>
         </div>
       </div>
@@ -452,6 +593,7 @@ export default function BannersPage() {
                 <th>العنوان العربي</th>
                 <th>Title EN</th>
                 <th>الرابط</th>
+                <th>الموضع</th>
                 <th>الترتيب</th>
                 <th>الحالة</th>
                 <th>إجراءات</th>
@@ -468,7 +610,8 @@ export default function BannersPage() {
                     </td>
                     <td style={{ fontWeight: 700 }}>{ar?.title || '-'}</td>
                     <td>{en?.title || '-'}</td>
-                    <td style={{ fontSize: 12, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{banner.linkUrl || '-'}</td>
+                    <td style={{ fontSize: 12, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{banner.linkUrl || '-'}</td>
+                    <td style={{ fontSize: 13 }}>{placementLabel(banner.placement)}</td>
                     <td>{banner.sortOrder}</td>
                     <td><span className={`badge ${banner.isActive ? 'badge-success' : 'badge-muted'}`}>{banner.isActive ? 'نشط' : 'مخفي'}</span></td>
                     <td>
@@ -484,7 +627,7 @@ export default function BannersPage() {
                 );
               })}
               {filteredBanners.length === 0 && (
-                <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--br-muted)', padding: 32 }}>لا توجد بنرات ضمن الفلاتر الحالية</td></tr>
+                <tr><td colSpan={8} style={{ textAlign: 'center', color: 'var(--br-muted)', padding: 32 }}>لا توجد بنرات ضمن الفلاتر الحالية</td></tr>
               )}
             </tbody>
           </table>

@@ -146,7 +146,7 @@ export class CartService {
   ): Prisma.InputJsonValue | undefined {
     const selected = { ...(selectedOptions || {}) };
 
-    if (product.type !== ProductType.COFFEE_BEAN) {
+    if (product.type !== ProductType.COFFEE_BEAN && product.type !== ProductType.GROUND_COFFEE) {
       if (selected.grindType || selected.grindOptionId) {
         throw new BadRequestException('Grind options can only be selected for coffee bean products');
       }

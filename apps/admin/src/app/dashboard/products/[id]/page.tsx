@@ -19,6 +19,23 @@ interface GrindOption {
   isActive: boolean;
 }
 
+interface Currency {
+  code: string;
+  name: string;
+  symbol: string;
+  isActive: boolean;
+}
+
+interface SizeOption {
+  id: string;
+  code: string;
+  nameAr: string;
+  sizeValue: number;
+  sizeUnit: string;
+  sortOrder: number;
+  isActive: boolean;
+}
+
 interface TranslationForm {
   locale: 'ar' | 'en';
   name: string;
@@ -68,6 +85,8 @@ const productTypeLabels: Record<ProductType, string> = {
 
 const productTypes = Object.keys(productTypeLabels) as ProductType[];
 
+const sizeUnits = ['ml', 'g', 'kg', 'cup', 'piece', 'bag'];
+
 const emptyForm: ProductForm = {
   type: 'HOT_DRINK',
   sku: '',
@@ -91,7 +110,7 @@ const emptyForm: ProductForm = {
       sizeUnit: '',
       isActive: true,
       sortOrder: 0,
-      prices: [{ currencyCode: 'SYP', amount: 0 }],
+      prices: [{ currencyCode: '', amount: 0 }],
     },
   ],
   grindOptionIds: [],
@@ -116,6 +135,21 @@ function normalizeTranslations(translations: Partial<TranslationForm>[] = []): T
   });
 }
 
+function getPriceError(variant: VariantForm, priceIndex: number, currencies: Currency[]): string | null {
+  const price = variant.prices[priceIndex];
+  if (!price.currencyCode || !currencies.find(c => c.code === price.currencyCode)) {
+    return 'اختر العملة من القائمة';
+  }
+  const count = variant.prices.filter(p => p.currencyCode === price.currencyCode).length;
+  if (count > 1) {
+    return 'هذه العملة مضافة سابقاً';
+  }
+  if (price.amount <= 0) {
+    return 'السعر يجب أن يكون أكبر من صفر';
+  }
+  return null;
+}
+
 export default function ProductEditPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -126,6 +160,10 @@ export default function ProductEditPage() {
   const [form, setForm] = useState<ProductForm>(emptyForm);
   const [categories, setCategories] = useState<Category[]>([]);
   const [grindOptions, setGrindOptions] = useState<GrindOption[]>([]);
+  const [currencies, setCurrencies] = useState<Currency[]>([]);
+  const [sizeOptions, setSizeOptions] = useState<SizeOption[]>([]);
+  const [sizeOptionSelections, setSizeOptionSelections] = useState<Record<number, string>>({});
+  const [showCurrencyMenu, setShowCurrencyMenu] = useState<Record<number, boolean>>({});
   const [error, setError] = useState<string | null>(null);
 
   const coffeeBeanGrindOptions = useMemo(
@@ -137,10 +175,14 @@ export default function ProductEditPage() {
     Promise.all([
       adminFetch<Category[]>('/categories?locale=ar'),
       adminFetch<GrindOption[]>('/grind-options'),
+      adminFetch<Currency[]>('/admin/currencies'),
+      adminFetch<SizeOption[]>('/admin/product-size-options'),
     ])
-      .then(([categoryItems, grindItems]) => {
+      .then(([categoryItems, grindItems, currencyItems, sizeOptionItems]) => {
         setCategories(categoryItems);
         setGrindOptions(grindItems);
+        setCurrencies(currencyItems);
+        setSizeOptions(sizeOptionItems);
       })
       .catch(console.error);
   }, []);
@@ -152,7 +194,7 @@ export default function ProductEditPage() {
     }
 
     setLoading(true);
-    adminFetch<any>(`/products/${params.id}`)
+    adminFetch<any>(`/admin/products/${params.id}`)
       .then(product => {
         setForm({
           type: product.type,
@@ -186,7 +228,7 @@ export default function ProductEditPage() {
                       currencyCode: price.currencyCode,
                       amount: Number(price.amount) || 0,
                     }))
-                  : [{ currencyCode: 'SYP', amount: 0 }],
+                  : [{ currencyCode: '', amount: 0 }],
               }))
             : emptyForm.variants,
           grindOptionIds: product.grindOptions?.map((link: any) => link.grindOptionId) || [],
@@ -232,7 +274,7 @@ export default function ProductEditPage() {
           method: 'POST',
           body: JSON.stringify({ url: result.url }),
         });
-        const product = await adminFetch<any>(`/products/${params.id}`);
+        const product = await adminFetch<any>(`/admin/products/${params.id}`);
         setForm(prev => ({
           ...prev,
           images: (product.images || []).map((img: any) => ({
@@ -308,6 +350,29 @@ export default function ProductEditPage() {
     }
   };
 
+  const handleSizeOptionChange = (variantIndex: number, optionId: string) => {
+    setSizeOptionSelections(prev => ({ ...prev, [variantIndex]: optionId }));
+    if (!optionId) return;
+    const option = sizeOptions.find(o => o.id === optionId);
+    if (option) {
+      updateVariant(variantIndex, {
+        name: option.nameAr,
+        sizeValue: option.sizeValue,
+        sizeUnit: option.sizeUnit,
+        sortOrder: option.sortOrder,
+      });
+    }
+  };
+
+  const applyCurrenciesToAllSizes = () => {
+    if (form.variants.length < 2) return;
+    const basePrices = form.variants[0].prices;
+    const updatedVariants = form.variants.map((v, i) =>
+      i === 0 ? v : { ...v, prices: basePrices.map(p => ({ ...p })) },
+    );
+    setForm({ ...form, variants: updatedVariants });
+  };
+
   const save = async () => {
     setError(null);
     if (!form.categoryId) {
@@ -320,7 +385,7 @@ export default function ProductEditPage() {
       const body = {
         ...form,
         imageUrl: form.imageUrl || undefined,
-        grindOptionIds: form.type === 'COFFEE_BEAN' ? form.grindOptionIds : [],
+        grindOptionIds: (form.type === 'COFFEE_BEAN' || form.type === 'GROUND_COFFEE') ? form.grindOptionIds : [],
         variants: form.variants.map(variant => ({
           ...variant,
           sizeValue: variant.sizeValue || undefined,
@@ -463,73 +528,136 @@ export default function ProductEditPage() {
           </div>
         </section>
 
-        <section className="card">
+        {/* Section 4: Sizes and Prices */}
+        <section className="card" style={{ padding: 20 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 16 }}>
             <h2 style={{ fontSize: 20, fontWeight: 700 }}>الأحجام والأسعار</h2>
-            <button
-              className="btn btn-sm"
-              style={{ background: 'var(--br-cream)' }}
-              onClick={() => setForm({
+            <div style={{ display: 'flex', gap: 8 }}>
+              {form.variants.length > 1 && (
+                <button className="btn btn-sm" style={{ background: 'var(--br-cream)' }} onClick={applyCurrenciesToAllSizes}>
+                  تطبيق نفس العملات على كل الأحجام
+                </button>
+              )}
+              <button className="btn btn-sm" style={{ background: 'var(--br-cream)' }} onClick={() => setForm({
                 ...form,
                 variants: [
                   ...form.variants,
-                  { name: 'Regular', sizeValue: null, sizeUnit: '', isActive: true, sortOrder: form.variants.length, prices: [{ currencyCode: 'SYP', amount: 0 }] },
+                  { name: 'Regular', sizeValue: null, sizeUnit: '', isActive: true, sortOrder: form.variants.length, prices: [{ currencyCode: '', amount: 0 }] },
                 ],
-              })}
-            >
-              إضافة خيار
-            </button>
+              })}>
+                إضافة خيار
+              </button>
+            </div>
           </div>
 
           <div style={{ display: 'grid', gap: 14 }}>
-            {form.variants.map((variant, variantIndex) => (
-              <div key={variantIndex} style={{ background: '#fafafa', borderRadius: 8, padding: 16 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(130px, 1fr))', gap: 12 }}>
-                  <input className="input" placeholder="اسم الخيار" value={variant.name} onChange={event => updateVariant(variantIndex, { name: event.target.value })} />
-                  <input className="input" type="number" placeholder="الحجم" value={variant.sizeValue ?? ''} onChange={event => updateVariant(variantIndex, { sizeValue: event.target.value ? Number(event.target.value) : null })} />
-                  <input className="input" placeholder="الوحدة" value={variant.sizeUnit} onChange={event => updateVariant(variantIndex, { sizeUnit: event.target.value })} />
-                  <input className="input" type="number" placeholder="الترتيب" value={variant.sortOrder} onChange={event => updateVariant(variantIndex, { sortOrder: Number(event.target.value) || 0 })} />
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 600 }}>
-                    <input type="checkbox" checked={variant.isActive} onChange={event => updateVariant(variantIndex, { isActive: event.target.checked })} />
-                    نشط
-                  </label>
-                </div>
+            {form.variants.map((variant, variantIndex) => {
+              const usedCurrencyCodes = variant.prices.map(p => p.currencyCode);
+              const unusedCurrencies = currencies.filter(c => c.isActive && !usedCurrencyCodes.includes(c.code));
 
-                <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
-                  {variant.prices.map((price, priceIndex) => (
-                    <div key={priceIndex} style={{ display: 'grid', gridTemplateColumns: '140px minmax(160px, 1fr) auto', gap: 10 }}>
-                      <input className="input" value={price.currencyCode} onChange={event => updatePrice(variantIndex, priceIndex, { currencyCode: event.target.value })} />
-                      <input className="input" type="number" value={price.amount} onChange={event => updatePrice(variantIndex, priceIndex, { amount: Number(event.target.value) || 0 })} />
+              return (
+                <div key={variantIndex} style={{ background: '#fafafa', borderRadius: 8, padding: 16 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(100px, 1fr))', gap: 8 }}>
+                    <select className="input" value={sizeOptionSelections[variantIndex] || ''} onChange={e => handleSizeOptionChange(variantIndex, e.target.value)}>
+                      <option value="">قالب الحجم</option>
+                      {sizeOptions.filter(o => o.isActive).map(option => (
+                        <option key={option.id} value={option.id}>{option.nameAr}</option>
+                      ))}
+                    </select>
+                    <input className="input" placeholder="الاسم" value={variant.name} onChange={e => updateVariant(variantIndex, { name: e.target.value })} />
+                    <input className="input" type="number" placeholder="الحجم" value={variant.sizeValue ?? ''} onChange={e => updateVariant(variantIndex, { sizeValue: e.target.value ? Number(e.target.value) : null })} />
+                    <select className="input" value={variant.sizeUnit} onChange={e => updateVariant(variantIndex, { sizeUnit: e.target.value })}>
+                      <option value="">الوحدة</option>
+                      {sizeUnits.map(unit => (
+                        <option key={unit} value={unit}>{unit}</option>
+                      ))}
+                    </select>
+                    <input className="input" type="number" placeholder="الترتيب" value={variant.sortOrder} onChange={e => updateVariant(variantIndex, { sortOrder: Number(e.target.value) || 0 })} />
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 600 }}>
+                      <input type="checkbox" checked={variant.isActive} onChange={e => updateVariant(variantIndex, { isActive: e.target.checked })} />
+                      نشط
+                    </label>
+                  </div>
+
+                  <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
+                    {variant.prices.map((price, priceIndex) => {
+                      const priceError = getPriceError(variant, priceIndex, currencies);
+                      return (
+                        <div key={priceIndex}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '140px minmax(160px, 1fr) auto', gap: 10 }}>
+                            <select className="input" value={price.currencyCode} onChange={e => updatePrice(variantIndex, priceIndex, { currencyCode: e.target.value })}>
+                              <option value="">اختر العملة</option>
+                              {currencies.filter(c => c.isActive).map(c => (
+                                <option key={c.code} value={c.code}>{c.code} - {c.name}</option>
+                              ))}
+                            </select>
+                            <input className="input" type="number" value={price.amount} placeholder="السعر" onChange={e => updatePrice(variantIndex, priceIndex, { amount: Number(e.target.value) || 0 })} />
+                            <button className="btn btn-sm" style={{ background: 'var(--br-cream)' }} onClick={() => {
+                              const prices = variant.prices.filter((_, i) => i !== priceIndex);
+                              updateVariant(variantIndex, { prices: prices.length ? prices : [{ currencyCode: '', amount: 0 }] });
+                            }}>
+                              حذف السعر
+                            </button>
+                          </div>
+                          {priceError && <div style={{ color: 'var(--br-danger)', fontSize: 12, marginTop: 4, marginRight: 2 }}>{priceError}</div>}
+                        </div>
+                      );
+                    })}
+
+                    <div style={{ position: 'relative' }}>
                       <button
                         className="btn btn-sm"
-                        style={{ background: 'var(--br-cream)' }}
-                        onClick={() => {
-                          const prices = variant.prices.filter((_, index) => index !== priceIndex);
-                          updateVariant(variantIndex, { prices: prices.length ? prices : [{ currencyCode: 'SYP', amount: 0 }] });
-                        }}
+                        style={{ background: 'var(--br-cream)', width: 'fit-content' }}
+                        onClick={() => setShowCurrencyMenu(prev => ({ ...prev, [variantIndex]: !prev[variantIndex] }))}
                       >
-                        حذف السعر
+                        إضافة سعر بعملة أخرى
                       </button>
+                      {showCurrencyMenu[variantIndex] && (
+                        <div style={{
+                          position: 'absolute', top: '100%', left: 0, zIndex: 10,
+                          background: '#fff', border: '1px solid var(--br-line)',
+                          borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                          minWidth: 180, maxHeight: 200, overflowY: 'auto', marginTop: 4,
+                        }}>
+                          {unusedCurrencies.length === 0 ? (
+                            <div style={{ padding: '8px 12px', fontSize: 13, color: 'var(--br-muted)' }}>جميع العملات مضافة</div>
+                          ) : (
+                            unusedCurrencies.map(c => (
+                              <button
+                                key={c.code}
+                                style={{
+                                  display: 'block', width: '100%', padding: '8px 12px',
+                                  textAlign: 'right', border: 'none', background: 'none',
+                                  cursor: 'pointer', fontSize: 14,
+                                }}
+                                onClick={() => {
+                                  updateVariant(variantIndex, { prices: [...variant.prices, { currencyCode: c.code, amount: 0 }] });
+                                  setShowCurrencyMenu(prev => ({ ...prev, [variantIndex]: false }));
+                                }}
+                                onMouseEnter={e => (e.target as HTMLElement).style.background = 'var(--br-cream)'}
+                                onMouseLeave={e => (e.target as HTMLElement).style.background = 'none'}
+                              >
+                                {c.code} - {c.name}
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      )}
                     </div>
-                  ))}
-                  <button
-                    className="btn btn-sm"
-                    style={{ background: 'var(--br-cream)', width: 'fit-content' }}
-                    onClick={() => updateVariant(variantIndex, { prices: [...variant.prices, { currencyCode: 'SYP', amount: 0 }] })}
-                  >
-                    إضافة سعر
-                  </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
 
-        {form.type === 'COFFEE_BEAN' && (
+        {(form.type === 'COFFEE_BEAN' || form.type === 'GROUND_COFFEE') && (
           <section className="card" style={{ padding: 20 }}>
             <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8, color: 'var(--br-gold-dark)' }}>خيارات الطحن المتاحة</h2>
             <p style={{ color: 'var(--br-muted)', fontSize: 13, marginBottom: 16 }}>
-              خيار Whole Bean يختاره العميل من نوع البن، أما الطرق التالية فهي للبن المطحون فقط.
+              {form.type === 'GROUND_COFFEE'
+                ? 'لبيع البن مطحوناً، اختر طرق الطحن المتاحة لهذا المنتج.'
+                : 'خيار Whole Bean يختاره العميل من نوع البن، أما الطرق التالية فهي للبن المطحون فقط.'}
             </p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
               {coffeeBeanGrindOptions.map(option => {

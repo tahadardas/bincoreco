@@ -5,6 +5,7 @@ import { formatMoney, MoneyAmount } from '@/lib/money';
 import EspressoButton from './espresso-button';
 import { resolveMediaUrl } from '@/lib/media';
 import { useBrand } from '@/lib/brand-context';
+import { useCurrency } from '@/lib/currency-context';
 
 export interface ProductSummary {
   id: string;
@@ -34,9 +35,9 @@ function translated(product: ProductSummary, locale: Locale) {
   return product.translations.find(item => item.locale === locale) || product.translations[0];
 }
 
-function price(product: ProductSummary) {
-  const item = product.variants[0]?.prices.find(value => value.currencyCode === 'SYP') || product.variants[0]?.prices[0];
-  return item ? formatMoney(item.amount, item.currencyCode) : '';
+function price(product: ProductSummary, currency: { code: string; symbol: string }) {
+  const item = product.variants[0]?.prices.find(value => value.currencyCode === currency.code);
+  return item ? formatMoney(item.amount, currency) : '';
 }
 
 function fallbackLetters(product: ProductSummary, locale: Locale) {
@@ -50,6 +51,7 @@ export default function ProductCard({ product, locale, labels }: ProductCardProp
   const name = t?.name || product.sku;
   const description = t?.shortDescription || '';
   const brand = useBrand();
+  const { selectedCurrency } = useCurrency();
 
   return (
     <article className="card product-card">
@@ -70,7 +72,7 @@ export default function ProductCard({ product, locale, labels }: ProductCardProp
         <h3 className="product-card__title">{name}</h3>
         <p className="product-card__desc">{description}</p>
         <div className="product-card__footer">
-          <span className="money">{price(product)}</span>
+          <span className="money">{selectedCurrency ? price(product, selectedCurrency) : ''}</span>
           <EspressoButton size="small" onClick={() => router.push(`/${locale}/products/${product.id}`)}>
             {labels.view}
           </EspressoButton>

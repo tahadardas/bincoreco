@@ -1,4 +1,4 @@
-import { ConflictException, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { v4 as uuid } from 'uuid';
@@ -63,6 +63,10 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    if (!user.isActive) {
+      throw new ForbiddenException('الحساب غير نشط، تواصل مع الإدارة');
+    }
+
     const isValid = await bcrypt.compare(input.password, user.passwordHash);
     if (!isValid) {
       throw new UnauthorizedException('Invalid credentials');
@@ -70,7 +74,7 @@ export class AuthService {
 
     const tokens = await this.generateTokens(user.id);
     return {
-      user: { id: user.id, email: user.email, phone: user.phone, fullName: user.fullName, role: user.role },
+      user: { id: user.id, email: user.email, phone: user.phone, fullName: user.fullName, role: user.role, mustChangePassword: user.mustChangePassword },
       ...tokens,
     };
   }
@@ -88,9 +92,15 @@ export class AuthService {
       const payload = this.jwtService.verify(refreshToken, {
         secret: process.env.JWT_SECRET || 'banco-ricco-dev-secret',
       });
+      if (payload.type !== 'refresh') {
+        throw new UnauthorizedException('Invalid token type');
+      }
       const user = await this.usersService.findById(payload.sub);
       if (!user) {
         throw new UnauthorizedException('Invalid refresh token');
+      }
+      if (!user.isActive) {
+        throw new UnauthorizedException('الحساب غير نشط');
       }
       return this.generateTokens(user.id);
     } catch {
@@ -98,10 +108,27 @@ export class AuthService {
     }
   }
 
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.passwordHash) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const isValid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!isValid) {
+      throw new BadRequestException('كلمة المرور الحالية غير صحيحة');
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash, mustChangePassword: false, passwordUpdatedAt: new Date() },
+    });
+  }
+
   private async generateTokens(userId: string) {
-    const payload = { sub: userId };
-    const accessToken = this.jwtService.sign(payload);
-    const refreshToken = this.jwtService.sign(payload, {
+    const accessToken = this.jwtService.sign({ sub: userId, type: 'access' });
+    const refreshToken = this.jwtService.sign({ sub: userId, type: 'refresh' }, {
       expiresIn: process.env.JWT_REFRESH_EXPIRATION || '7d',
     });
     return { accessToken, refreshToken };

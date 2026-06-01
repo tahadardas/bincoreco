@@ -3,43 +3,22 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { api } from '@/lib/api';
 import { getDictionary, Locale } from '@/lib/dictionaries';
 import { contactFormSchema } from '@/lib/forms';
 import EspressoButton from '@/components/espresso-button';
 import { RevealSection } from '@/components/scroll-reveal';
 
-interface FormState {
-  fullName: string;
-  phone: string;
-  email: string;
-  subject: string;
-  message: string;
-}
-
-const initialForm: FormState = { fullName: '', phone: '', email: '', subject: '', message: '' };
-
-const defaults = {
-  contact_phone: '+963 11 234 5678',
-  contact_whatsapp: '+963 933 123 456',
-  contact_address: 'Damascus, Al-Mazzeh, Syria',
-  contact_hours: 'Sat–Thu: 8:00 AM – 11:00 PM',
-  contact_instagram: '@banco.ricco',
-  contact_hero_title_ar: '',
-  contact_hero_title_en: '',
-  contact_hero_sub_ar: '',
-  contact_hero_sub_en: '',
-  contact_form_title_ar: '',
-  contact_form_title_en: '',
-  contact_map_title_ar: '',
-  contact_map_title_en: '',
-  contact_success_msg_ar: '',
-  contact_success_msg_en: '',
-  contact_cta_order_ar: '',
-  contact_cta_order_en: '',
-  contact_cta_whatsapp_ar: '',
-  contact_cta_whatsapp_en: '',
-};
+const contentFields = [
+    'contact_phone', 'contact_whatsapp', 'contact_email',
+    'contact_address', 'contact_hours', 'contact_instagram', 'contact_facebook',
+    'contact_map_embed_url', 'contact_map_link',
+    'contact_hero_title', 'contact_hero_sub',
+    'contact_form_title', 'contact_map_title',
+    'contact_success_msg',
+    'contact_cta_order', 'contact_cta_whatsapp',
+  ] as const;
 
 function SectionHeader({ eyebrow, title }: { eyebrow: string; title: string }) {
   return (
@@ -57,63 +36,40 @@ export default function ContactPage() {
   const router = useRouter();
   const locale = (params.locale as Locale) || 'ar';
   const dict = getDictionary(locale);
-  const dir = locale === 'ar' ? 'rtl' : 'ltr';
 
-  const [form, setForm] = useState<FormState>(initialForm);
+  const { register, handleSubmit: handleRHFSubmit, formState: { errors, isSubmitting }, reset: resetForm } = useForm<z.infer<typeof contactFormSchema>>({
+    resolver: zodResolver(contactFormSchema),
+  });
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
-  const [contactVals, setContactVals] = useState(defaults);
+  const [contactVals, setContactVals] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    api.get<Record<string, string | null>>('/settings/public-brand').then((data) => {
-      setContactVals(prev => ({
-        ...prev,
-        contact_phone: data.contact_phone || defaults.contact_phone,
-        contact_whatsapp: data.contact_whatsapp || defaults.contact_whatsapp,
-        contact_address: data.contact_address || defaults.contact_address,
-        contact_hours: data.contact_hours || defaults.contact_hours,
-        contact_instagram: data.contact_instagram || defaults.contact_instagram,
-        contact_hero_title_ar: data.contact_hero_title_ar || '',
-        contact_hero_title_en: data.contact_hero_title_en || '',
-        contact_hero_sub_ar: data.contact_hero_sub_ar || '',
-        contact_hero_sub_en: data.contact_hero_sub_en || '',
-        contact_form_title_ar: data.contact_form_title_ar || '',
-        contact_form_title_en: data.contact_form_title_en || '',
-        contact_map_title_ar: data.contact_map_title_ar || '',
-        contact_map_title_en: data.contact_map_title_en || '',
-        contact_success_msg_ar: data.contact_success_msg_ar || '',
-        contact_success_msg_en: data.contact_success_msg_en || '',
-        contact_cta_order_ar: data.contact_cta_order_ar || '',
-        contact_cta_order_en: data.contact_cta_order_en || '',
-        contact_cta_whatsapp_ar: data.contact_cta_whatsapp_ar || '',
-        contact_cta_whatsapp_en: data.contact_cta_whatsapp_en || '',
-      }));
+    api.get<Record<string, string | null>>('/settings/public-content').then((data) => {
+      if (!data) return;
+      const newVals: Record<string, string> = {};
+      for (const key of contentFields as unknown as string[]) {
+        const val = data[key];
+        if (val) newVals[key] = val;
+      }
+      for (const key of contentFields as unknown as string[]) {
+        const arVal = data[`${key}_ar`];
+        if (arVal) newVals[`${key}_ar`] = arVal;
+        const enVal = data[`${key}_en`];
+        if (enVal) newVals[`${key}_en`] = enVal;
+      }
+      setContactVals(newVals);
     }).catch(() => {});
   }, []);
 
-  const update = (field: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setForm(prev => ({ ...prev, [field]: e.target.value }));
-  };
-
-  const validate = (): string | null => {
-    if (!form.fullName.trim()) return dict.contact.fullName + ' ' + 'required';
-    if (!form.phone.trim()) return dict.contact.phoneLabel + ' ' + 'required';
-    if (!form.message.trim()) return dict.contact.message + ' ' + 'required';
-    if (form.message.trim().length > 2000) return dict.contact.message + ' max 2000';
-    return null;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onFormSubmit = async (data: z.infer<typeof contactFormSchema>) => {
     setError('');
-    const validationError = validate();
-    if (validationError) { setError(validationError); return; }
     setSending(true);
     try {
-      await api.post('/contact-messages', form);
+      await api.post('/contact-messages', data);
       setSent(true);
-      setForm(initialForm);
+      resetForm();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
@@ -122,15 +78,16 @@ export default function ContactPage() {
   };
 
   const infoCards = [
-    { label: dict.contact.phone, icon: '📞', value: contactVals.contact_phone },
-    { label: dict.contact.whatsapp, icon: '💬', value: contactVals.contact_whatsapp },
-    { label: dict.contact.address, icon: '📍', value: contactVals.contact_address },
-    { label: dict.contact.hours, icon: '🕒', value: contactVals.contact_hours },
-    { label: dict.contact.instagram, icon: '📷', value: contactVals.contact_instagram },
+    { label: dict.contact.phone, icon: '📞', value: contactVals.contact_phone || '' },
+    { label: dict.contact.whatsapp, icon: '💬', value: contactVals.contact_whatsapp || '' },
+    { label: dict.contact.emailLabel, icon: '📧', value: contactVals.contact_email || '' },
+    { label: dict.contact.address, icon: '📍', value: contactVals[`contact_address_${locale}`] || contactVals.contact_address || '' },
+    { label: dict.contact.hours, icon: '🕒', value: contactVals[`contact_hours_${locale}`] || contactVals.contact_hours || '' },
+    { label: dict.contact.instagram, icon: '📷', value: contactVals.contact_instagram || '' },
   ];
 
   return (
-    <div className="page-shell" dir={dir}>
+    <div className="page-shell" dir={locale === 'ar' ? 'rtl' : 'ltr'}>
       {/* Hero */}
       <section className="bg-hero-dark" style={{
         position: 'relative',
@@ -189,7 +146,7 @@ export default function ContactPage() {
                 </EspressoButton>
               </div>
             ) : (
-              <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 16 }}>
+              <form onSubmit={handleRHFSubmit(onFormSubmit)} style={{ display: 'grid', gap: 16 }}>
                 <SectionHeader eyebrow={dict.nav.contact} title={contactVals[`contact_form_title_${locale}`] || dict.contact.formTitle} />
 
                 {error && (
@@ -206,22 +163,32 @@ export default function ContactPage() {
                   </div>
                 )}
 
-                <input className="input" placeholder={dict.contact.fullName} value={form.fullName} onChange={update('fullName')} />
-                <input className="input" placeholder={dict.contact.phoneLabel} value={form.phone} onChange={update('phone')} />
-                <input className="input" placeholder={dict.contact.emailLabel} value={form.email} onChange={update('email')} />
-                <input className="input" placeholder={dict.contact.subject} value={form.subject} onChange={update('subject')} />
-                <textarea
-                  className="input"
-                  style={{ minHeight: 120, resize: 'vertical' }}
-                  placeholder={dict.contact.message}
-                  value={form.message}
-                  onChange={update('message')}
-                  maxLength={2000}
-                />
-                <div style={{ textAlign: 'end', fontSize: 12, color: 'var(--br-muted)' }}>
-                  {form.message.length}/2000
+                <div>
+                  <input className="input" placeholder={dict.contact.fullName} {...register('fullName')} />
+                  {errors.fullName && <div style={{ color: 'var(--br-danger)', fontSize: 13, marginTop: 4 }}>{errors.fullName.message}</div>}
                 </div>
-                <EspressoButton type="submit" loading={sending} size="large">
+                <div>
+                  <input className="input" placeholder={dict.contact.phoneLabel} {...register('phone')} />
+                  {errors.phone && <div style={{ color: 'var(--br-danger)', fontSize: 13, marginTop: 4 }}>{errors.phone.message}</div>}
+                </div>
+                <div>
+                  <input className="input" placeholder={dict.contact.emailLabel} {...register('email')} />
+                  {errors.email && <div style={{ color: 'var(--br-danger)', fontSize: 13, marginTop: 4 }}>{errors.email.message}</div>}
+                </div>
+                <div>
+                  <input className="input" placeholder={dict.contact.subject} {...register('subject')} />
+                </div>
+                <div>
+                  <textarea
+                    className="input"
+                    style={{ minHeight: 120, resize: 'vertical' }}
+                    placeholder={dict.contact.message}
+                    {...register('message')}
+                    maxLength={2000}
+                  />
+                  {errors.message && <div style={{ color: 'var(--br-danger)', fontSize: 13, marginTop: 4 }}>{errors.message.message}</div>}
+                </div>
+                <EspressoButton type="submit" loading={isSubmitting || sending} size="large">
                   {dict.contact.submit}
                 </EspressoButton>
               </form>
@@ -236,27 +203,29 @@ export default function ContactPage() {
           <div className="container">
             <SectionHeader eyebrow={dict.nav.contact} title={contactVals[`contact_map_title_${locale}`] || dict.contact.mapPlaceholder} />
             <div className="card" style={{ overflow: 'hidden' }}>
-              <div style={{
-                width: '100%',
-                aspectRatio: '16 / 7',
-                minHeight: 280,
-                background: 'var(--br-espresso)',
-                display: 'grid',
-                placeItems: 'center',
-                color: 'var(--br-gold-light)',
-                fontWeight: 700,
-              }}>
-                <iframe
-                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2133.614!2d36.2765!3d33.5131!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMzPCsDMwJzQ3LjIiTiAzNsKwMTYnMzUuNSJF!5e0!3m2!1sen!2s!4v1"
-                  width="100%"
-                  height="100%"
-                  style={{ border: 0, minHeight: 280 }}
-                  allowFullScreen
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                  title={contactVals[`contact_map_title_${locale}`] || dict.contact.mapPlaceholder}
-                />
-              </div>
+              {contactVals.contact_map_embed_url ? (
+                <div style={{ width: '100%', aspectRatio: '16 / 7', minHeight: 280 }}>
+                  <iframe
+                    src={contactVals.contact_map_embed_url}
+                    width="100%"
+                    height="100%"
+                    style={{ border: 0, minHeight: 280 }}
+                    allowFullScreen
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                    title={contactVals[`contact_map_title_${locale}`] || dict.contact.mapPlaceholder}
+                  />
+                </div>
+              ) : (
+                <div style={{
+                  width: '100%', aspectRatio: '16 / 7', minHeight: 280,
+                  background: 'var(--br-espresso)',
+                  display: 'grid', placeItems: 'center',
+                  color: 'var(--br-gold-light)', fontWeight: 700,
+                }}>
+                  {locale === 'ar' ? 'لم يتم ضبط الخريطة بعد' : 'Map not configured yet'}
+                </div>
+              )}
             </div>
           </div>
         </section>
@@ -281,7 +250,7 @@ export default function ContactPage() {
               <EspressoButton size="large" onClick={() => router.push(`/${locale}/products`)}>
                 {contactVals[`contact_cta_order_${locale}`] || dict.contact.ctaOrder}
               </EspressoButton>
-              <EspressoButton tone="outline" size="large" onClick={() => window.open(`https://wa.me/${contactVals.contact_whatsapp.replace(/[^0-9]/g, '')}`, '_blank')}>
+              <EspressoButton tone="outline" size="large" onClick={() => window.open(`https://wa.me/${(contactVals.contact_whatsapp || '').replace(/[^0-9]/g, '')}`, '_blank')}>
                 {contactVals[`contact_cta_whatsapp_${locale}`] || dict.contact.ctaWhatsapp}
               </EspressoButton>
             </div>

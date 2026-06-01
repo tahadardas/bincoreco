@@ -1,6 +1,7 @@
 import { CSSProperties, ReactNode } from 'react';
 import { AuthProvider } from '@/lib/auth-context';
 import { BrandProvider } from '@/lib/brand-context';
+import { CurrencyProvider } from '@/lib/currency-context';
 import Header from '@/components/header';
 import LocaleHeadUpdater from '@/components/locale-head-updater';
 import { getPublicBrandSettings, resolveBrandAsset } from '@/lib/brand-settings';
@@ -34,6 +35,7 @@ export default async function LocaleLayout({ children, params }: { children: Rea
 
   return (
     <AuthProvider>
+      <CurrencyProvider>
       <BrandProvider settings={brand}>
         <LocaleHeadUpdater lang={params.locale === 'ar' ? 'ar' : 'en'} favicon={faviconUrl} />
         <div dir={dir} className="site-shell" style={brandVars}>
@@ -82,6 +84,7 @@ export default async function LocaleLayout({ children, params }: { children: Rea
           </footer>
         </div>
       </BrandProvider>
+      </CurrencyProvider>
     </AuthProvider>
   );
 }

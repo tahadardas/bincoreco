@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { Prisma, ProductType } from '@prisma/client';
 import { CreateOrderInput, CreateGuestOrderInput } from '@banco-ricco/validators';
 import { PrismaService } from '../prisma/prisma.service';
@@ -92,6 +92,22 @@ export class OrdersService {
     if (order.customerId) throw new BadRequestException('Order already linked to a registered user');
     if (order.status !== 'PICKED_UP') throw new BadRequestException('Order must be picked up before claiming rewards');
 
+    if (order.guestPhone && input.phone && order.guestPhone !== input.phone) {
+      throw new BadRequestException('رقم الهاتف لا يطابق رقم هاتف الطلب');
+    }
+
+    const existingUser = await this.prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: input.email || undefined },
+          { phone: input.phone || undefined },
+        ].filter(cond => Object.values(cond)[0] !== undefined),
+      },
+    });
+    if (existingUser) {
+      throw new ConflictException('يوجد حساب مسبق بهذا البريد أو الهاتف، الرجاء تسجيل الدخول أولاً');
+    }
+
     const hashedPassword = await bcrypt.hash(input.password, 10);
     const user = await this.prisma.user.create({
       data: {
@@ -128,10 +144,18 @@ export class OrdersService {
       }
     }
 
+    await this.auditLogs.record({
+      action: AuditActions.REWARD_CLAIMED,
+      entityType: 'Order',
+      entityId: order.id,
+      afterSnapshot: { userId: user.id, orderNumber: order.orderNumber },
+    });
+
     const accessToken = this.jwtService.sign({
       sub: user.id,
       email: user.email,
       role: user.role,
+      type: 'access',
     });
 
     const refreshToken = this.jwtService.sign(
@@ -146,6 +170,49 @@ export class OrdersService {
       pendingCoins: order.pendingCoins,
       pendingStamps: order.pendingStamps,
     };
+  }
+
+  async claimRewardAuthenticated(userId: string, token: string) {
+    const order = await this.prisma.order.findUnique({ where: { rewardClaimToken: token } });
+    if (!order) throw new NotFoundException('Invalid reward claim token');
+    if (order.rewardClaimedAt) throw new BadRequestException('Reward already claimed');
+    if (order.customerId) throw new BadRequestException('Order already linked to a registered user');
+    if (order.status !== 'PICKED_UP') throw new BadRequestException('Order must be picked up before claiming rewards');
+
+    if (order.guestPhone) {
+      const user = await this.prisma.user.findUnique({ where: { id: userId } });
+      if (!user || user.phone !== order.guestPhone) {
+        throw new ForbiddenException('رقم هاتف الحساب لا يطابق رقم هاتف الطلب');
+      }
+    }
+
+    await this.prisma.order.update({
+      where: { id: order.id },
+      data: {
+        customerId: userId,
+        rewardClaimedAt: new Date(),
+        pendingCoins: 0,
+        pendingStamps: 0,
+      },
+    });
+
+    if (order.pendingCoins > 0) {
+      await this.loyaltyService.awardPoints(userId, order.pendingCoins, `Claimed guest rewards for order ${order.orderNumber}`, order.id);
+    }
+    if (order.pendingStamps > 0) {
+      for (let i = 0; i < order.pendingStamps; i++) {
+        await this.loyaltyService.awardStamp(userId, order.id);
+      }
+    }
+
+    await this.auditLogs.record({
+      action: AuditActions.REWARD_CLAIMED,
+      entityType: 'Order',
+      entityId: order.id,
+      afterSnapshot: { userId, orderNumber: order.orderNumber },
+    });
+
+    return { message: 'Rewards claimed successfully', pendingCoins: order.pendingCoins, pendingStamps: order.pendingStamps };
   }
 
   private async buildOrderItems(
@@ -374,7 +441,7 @@ export class OrdersService {
   }) {
     const selectedOptions = this.getSelectedOptionsRecord(item.selectedOptions);
 
-    if (item.product.type !== ProductType.COFFEE_BEAN) {
+    if (item.product.type !== ProductType.COFFEE_BEAN && item.product.type !== ProductType.GROUND_COFFEE) {
       if (selectedOptions.grindType || selectedOptions.grindOptionId) {
         throw new BadRequestException('Grind options can only be selected for coffee bean products');
       }

@@ -65,6 +65,17 @@ export class OrdersController {
     return successResponse(result, 'Reward claimed! Welcome to Banco Ricco.');
   }
 
+  @Post('orders/claim-reward-authenticated')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  async claimRewardAuthenticated(
+    @Req() req: AuthenticatedRequest,
+    @Body() body: { rewardClaimToken: string },
+  ) {
+    const result = await this.ordersService.claimRewardAuthenticated(req.user.id, body.rewardClaimToken);
+    return successResponse(result, 'Reward claimed successfully.');
+  }
+
   @Get('orders/my')
   @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()

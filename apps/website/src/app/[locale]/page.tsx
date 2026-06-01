@@ -8,6 +8,7 @@ import AuthModal from '@/components/auth-modal';
 import EspressoButton from '@/components/espresso-button';
 import ProductCard, { ProductSummary } from '@/components/product-card';
 import BannerCarousel from '@/components/banner-carousel';
+import HeroBackgroundCarousel from '@/components/hero-background-carousel';
 import { RevealSection } from '@/components/scroll-reveal';
 
 interface Banner {
@@ -53,7 +54,8 @@ export default function HomePage() {
   const locale = (params.locale as Locale) || 'ar';
   const dict = getDictionary(locale);
   const { resolvedMark } = useBrand();
-  const [banners, setBanners] = useState<Banner[]>([]);
+  const [heroSlides, setHeroSlides] = useState<Banner[]>([]);
+  const [promoBanners, setPromoBanners] = useState<Banner[]>([]);
   const [bestSellers, setBestSellers] = useState<ProductSummary[]>([]);
   const [maestroPicks, setMaestroPicks] = useState<ProductSummary[]>([]);
   const [beans, setBeans] = useState<ProductSummary[]>([]);
@@ -70,13 +72,15 @@ export default function HomePage() {
 
   useEffect(() => {
     Promise.all([
-      api.get<Banner[]>(`/banners?locale=${locale}`),
+      api.get<Banner[]>(`/banners?locale=${locale}&placement=HOME_HERO`),
+      api.get<Banner[]>(`/banners?locale=${locale}&placement=HOME_PROMO`),
       api.get<ProductSummary[]>(`/products/best-sellers?locale=${locale}`),
       api.get<ProductSummary[]>(`/products/maestro-picks?locale=${locale}`),
       api.get<ProductSummary[]>(`/products?locale=${locale}&type=COFFEE_BEAN&limit=6`),
       api.get<ProductSummary[]>(`/products?locale=${locale}&search=${encodeURIComponent('B.R Special')}&limit=2`),
-    ]).then(([bannerData, best, picks, beanProducts, special]) => {
-      setBanners(bannerData);
+    ]).then(([heroData, promoData, best, picks, beanProducts, special]) => {
+      setHeroSlides(heroData);
+      setPromoBanners(promoData);
       setBestSellers(best);
       setMaestroPicks(picks);
       setBeans(beanProducts);
@@ -102,66 +106,70 @@ export default function HomePage() {
 
   return (
     <div className="page-pattern-surface">
-      <section className="bg-hero-dark" style={{
-        position: 'relative',
-        overflow: 'hidden',
-        color: 'var(--br-white)',
-        padding: '82px 0 58px',
-      }}>
-        <img
-          src={resolvedMark}
-          alt=""
-          aria-hidden="true"
-          style={{
-            position: 'absolute',
-            insetInlineEnd: '7%',
-            top: 34,
-            width: 'min(34vw, 360px)',
-            opacity: 0.12,
-            filter: 'drop-shadow(0 22px 40px rgba(0,0,0,0.25))',
-          }}
-        />
-        <div className="container hero-grid" style={{ position: 'relative' }}>
-          <div>
-            <div className="section-eyebrow" style={{ color: 'var(--br-gold-light)', marginBottom: 12 }}>
-              {dict.home.heroEyebrow}
+      {heroSlides.length > 0 ? (
+        <HeroBackgroundCarousel slides={heroSlides} locale={locale} />
+      ) : (
+        <section className="bg-hero-dark" style={{
+          position: 'relative',
+          overflow: 'hidden',
+          color: 'var(--br-white)',
+          padding: '82px 0 58px',
+        }}>
+          <img
+            src={resolvedMark}
+            alt=""
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              insetInlineEnd: '7%',
+              top: 34,
+              width: 'min(34vw, 360px)',
+              opacity: 0.12,
+              filter: 'drop-shadow(0 22px 40px rgba(0,0,0,0.25))',
+            }}
+          />
+          <div className="container hero-grid" style={{ position: 'relative' }}>
+            <div>
+              <div className="section-eyebrow" style={{ color: 'var(--br-gold-light)', marginBottom: 12 }}>
+                {dict.home.heroEyebrow}
+              </div>
+              <h1 style={{ fontSize: 'clamp(32px, 6vw, 56px)', lineHeight: 1.06, fontWeight: 900, color: 'var(--br-gold-light)', marginBottom: 18 }}>
+                {dict.home.title}
+              </h1>
+              <p style={{ fontSize: 'clamp(16px, 2.5vw, 20px)', color: 'rgba(255,250,240,0.86)', maxWidth: 680, marginBottom: 30 }}>
+                {dict.home.subtitle}
+              </p>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                <EspressoButton size="large" onClick={() => router.push(`/${locale}/products`)}>
+                  {dict.home.orderNow}
+                </EspressoButton>
+                <EspressoButton tone="dark" size="large" onClick={() => router.push(`/${locale}/products?maestro=1`)}>
+                  {dict.home.heroSecondary}
+                </EspressoButton>
+              </div>
             </div>
-            <h1 style={{ fontSize: 'clamp(32px, 6vw, 56px)', lineHeight: 1.06, fontWeight: 900, color: 'var(--br-gold-light)', marginBottom: 18 }}>
-              {dict.home.title}
-            </h1>
-            <p style={{ fontSize: 'clamp(16px, 2.5vw, 20px)', color: 'rgba(255,250,240,0.86)', maxWidth: 680, marginBottom: 30 }}>
-              {dict.home.subtitle}
-            </p>
-            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-              <EspressoButton size="large" onClick={() => router.push(`/${locale}/products`)}>
-                {dict.home.orderNow}
-              </EspressoButton>
-              <EspressoButton tone="dark" size="large" onClick={() => router.push(`/${locale}/products?maestro=1`)}>
-                {dict.home.heroSecondary}
-              </EspressoButton>
+            <div style={{
+              border: '1px solid rgba(201,150,26,0.38)',
+              borderRadius: 8,
+              padding: 20,
+              background: 'rgba(255,250,240,0.06)',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.24)',
+            }}>
+              <div style={{ aspectRatio: '1 / 1', display: 'grid', placeItems: 'center', border: '1px solid rgba(201,150,26,0.28)', borderRadius: 8 }}>
+                <img src={resolvedMark} alt="BR Banco Ricco" style={{ width: '70%', maxHeight: '80%', objectFit: 'contain' }} />
+              </div>
+              <div style={{ marginTop: 14, color: 'rgba(255,250,240,0.8)', fontWeight: 700 }}>
+                {dict.home.respectBeans}
+              </div>
             </div>
           </div>
-          <div style={{
-            border: '1px solid rgba(201,150,26,0.38)',
-            borderRadius: 8,
-            padding: 20,
-            background: 'rgba(255,250,240,0.06)',
-            boxShadow: '0 20px 60px rgba(0,0,0,0.24)',
-          }}>
-            <div style={{ aspectRatio: '1 / 1', display: 'grid', placeItems: 'center', border: '1px solid rgba(201,150,26,0.28)', borderRadius: 8 }}>
-              <img src={resolvedMark} alt="BR Banco Ricco" style={{ width: '70%', maxHeight: '80%', objectFit: 'contain' }} />
-            </div>
-            <div style={{ marginTop: 14, color: 'rgba(255,250,240,0.8)', fontWeight: 700 }}>
-              {dict.home.respectBeans}
-            </div>
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
-      {banners.length > 0 && (
+      {promoBanners.length > 0 && (
         <section className="banner-carousel-section">
           <div className="container">
-            <BannerCarousel banners={banners} locale={locale} />
+            <BannerCarousel banners={promoBanners} locale={locale} />
           </div>
         </section>
       )}

@@ -5,6 +5,7 @@ import { api } from '@/lib/api';
 import { getDictionary, Locale } from '@/lib/dictionaries';
 import { useAuth } from '@/lib/auth-context';
 import { formatMoney, MoneyAmount, toMoneyNumber } from '@/lib/money';
+import { useCurrency } from '@/lib/currency-context';
 import { getGuestSession } from '@/lib/guest-session';
 import EspressoButton from '@/components/espresso-button';
 import RewardModal from '@/components/reward-modal';
@@ -64,6 +65,7 @@ export default function CartPage() {
   } | null>(null);
 
   const isGuest = !token;
+  const { selectedCurrency } = useCurrency();
   const sessionId = useMemo(() => isGuest ? getGuestSession() : '', [isGuest]);
   const minimumPickup = useMemo(() => toDatetimeLocal(new Date(Date.now() + 15 * 60_000)), []);
 
@@ -146,7 +148,7 @@ export default function CartPage() {
   };
 
   const total = items.reduce((sum, item) => {
-    const selectedPrice = item.variant?.prices.find(p => p.currencyCode === 'SYP') || item.variant?.prices[0];
+    const selectedPrice = item.variant?.prices.find(p => p.currencyCode === (selectedCurrency?.code || 'SYP')) || item.variant?.prices[0];
     return sum + toMoneyNumber(selectedPrice?.amount) * item.quantity;
   }, 0);
 
@@ -171,7 +173,7 @@ export default function CartPage() {
           <div className="checkout-grid">
             <div style={{ display: 'grid', gap: 14 }}>
               {items.map(item => {
-                const selectedPrice = item.variant?.prices.find(p => p.currencyCode === 'SYP') || item.variant?.prices[0];
+    const selectedPrice = item.variant?.prices.find(p => p.currencyCode === (selectedCurrency?.code || 'SYP')) || item.variant?.prices[0];
                 const grind = grindLabel(item, locale);
                 return (
                   <div key={item.id} className="card" style={{ padding: 18 }}>
@@ -183,7 +185,7 @@ export default function CartPage() {
                         <div style={{ fontSize: 14, color: 'var(--br-muted)' }}>{dict.product.quantity}: {item.quantity}</div>
                       </div>
                       <div style={{ textAlign: 'end' }}>
-                        <div className="money">{formatMoney(toMoneyNumber(selectedPrice?.amount) * item.quantity, selectedPrice?.currencyCode || 'SYP')}</div>
+                        <div className="money">{formatMoney(toMoneyNumber(selectedPrice?.amount) * item.quantity, selectedCurrency || 'SYP')}</div>
                         <button onClick={() => removeItem(item.id)} style={{ background: 'none', color: 'var(--br-danger)', fontSize: 13, marginTop: 6 }}>
                           {dict.cart.remove}
                         </button>
@@ -196,7 +198,7 @@ export default function CartPage() {
 
             <aside className="card" style={{ padding: 22 }}>
               <div style={{ fontSize: 15, color: 'var(--br-muted)' }}>{dict.cart.total}</div>
-              <div style={{ fontSize: 32, fontWeight: 900, color: 'var(--br-gold-dark)', marginBottom: 18 }}>{formatMoney(total)}</div>
+              <div style={{ fontSize: 32, fontWeight: 900, color: 'var(--br-gold-dark)', marginBottom: 18 }}>{formatMoney(total, selectedCurrency || 'SYP')}</div>
 
               {isGuest && showGuestForm && (
                 <>
