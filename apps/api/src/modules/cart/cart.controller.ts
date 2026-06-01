@@ -11,10 +11,11 @@ import { CartService } from './cart.service';
 import { successResponse } from '../../common/response.interface';
 import { AuthenticatedRequest } from '../../common/auth/authenticated-request.type';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
+import { MustChangePasswordGuard } from '../../common/auth/must-change-password.guard';
 
 @ApiTags('Cart')
 @Controller('cart')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), MustChangePasswordGuard)
 @ApiBearerAuth()
 export class CartController {
   constructor(private cartService: CartService) {}

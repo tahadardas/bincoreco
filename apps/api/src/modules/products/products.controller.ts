@@ -58,6 +58,7 @@ export class ProductsController {
       isActive: true,
       isBestSeller: isBestSeller ? true : undefined,
       isMaestroPick: isMaestroPick ? true : undefined,
+      requireActiveCategory: true,
     });
     return paginatedResponse(result.items, result.total, result.page, result.limit);
   }

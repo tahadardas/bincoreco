@@ -79,14 +79,17 @@ export class ReviewsService {
       if (!order || !order.items.some(item => item.productId === input.productId)) {
         throw new BadRequestException('Order number is not valid for this product');
       }
-      if (input.userId && order.customerId && order.customerId !== input.userId) {
+      if (order.status !== 'PICKED_UP') {
+        throw new BadRequestException('Order must be picked up before reviewing this product');
+      }
+      if (input.userId && order.customerId !== input.userId) {
         throw new ForbiddenException('Order does not belong to the authenticated user');
       }
-      if (input.guestPhone && order.guestPhone && input.guestPhone !== order.guestPhone) {
+      if (!input.userId && (!input.guestPhone || !order.guestPhone || input.guestPhone !== order.guestPhone)) {
         throw new ForbiddenException('Guest phone does not match this order');
       }
       orderId = order.id;
-      isVerifiedPurchase = order.status === 'PICKED_UP';
+      isVerifiedPurchase = true;
     }
 
     if (input.userId) {

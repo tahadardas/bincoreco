@@ -30,7 +30,7 @@ export default function LoginPage() {
       }
       localStorage.setItem('admin_token', result.data.accessToken);
       localStorage.setItem('admin_user', JSON.stringify(result.data.user));
-      router.push('/dashboard');
+      router.push(result.data.user.mustChangePassword ? '/change-password' : '/dashboard');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'تعذر تسجيل الدخول');
     }

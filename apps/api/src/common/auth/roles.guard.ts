@@ -7,6 +7,7 @@ type RequestWithUser = Request & {
   user?: {
     id: string;
     role?: string | null;
+    mustChangePassword?: boolean;
   };
 };
 
@@ -26,6 +27,10 @@ export class RolesGuard implements CanActivate {
 
     const request = context.switchToHttp().getRequest<RequestWithUser>();
     const role = request.user?.role;
+
+    if (request.user?.mustChangePassword) {
+      throw new ForbiddenException('يجب تغيير كلمة المرور قبل متابعة العملية');
+    }
 
     if (!role || !allowedRoles.includes(role as AppRole)) {
       throw new ForbiddenException('هذا الحساب لا يملك صلاحية تنفيذ هذه العملية');

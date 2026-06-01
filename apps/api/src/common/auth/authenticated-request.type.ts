@@ -7,6 +7,7 @@ export interface AuthenticatedUser {
   phone: string | null;
   fullName: string;
   role: AppRole;
+  mustChangePassword?: boolean;
 }
 
 export type AuthenticatedRequest = Request & {

@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 interface AdminUser {
   fullName?: string;
   role?: string;
+  mustChangePassword?: boolean;
 }
 
 const links = [
@@ -40,7 +41,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     }
     const storedUser = localStorage.getItem('admin_user');
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
+      const parsedUser = JSON.parse(storedUser) as AdminUser;
+      if (parsedUser.mustChangePassword) {
+        router.replace('/change-password');
+        return;
+      }
+      setUser(parsedUser);
     }
   }, [router]);
 

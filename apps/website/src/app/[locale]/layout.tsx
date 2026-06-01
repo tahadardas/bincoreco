@@ -4,6 +4,7 @@ import { BrandProvider } from '@/lib/brand-context';
 import { CurrencyProvider } from '@/lib/currency-context';
 import Header from '@/components/header';
 import LocaleHeadUpdater from '@/components/locale-head-updater';
+import PasswordChangeGate from '@/components/password-change-gate';
 import { getPublicBrandSettings, resolveBrandAsset } from '@/lib/brand-settings';
 import { resolveMediaUrl } from '@/lib/media';
 
@@ -35,6 +36,7 @@ export default async function LocaleLayout({ children, params }: { children: Rea
 
   return (
     <AuthProvider>
+      <PasswordChangeGate locale={params.locale === 'ar' ? 'ar' : 'en'} />
       <CurrencyProvider>
       <BrandProvider settings={brand}>
         <LocaleHeadUpdater lang={params.locale === 'ar' ? 'ar' : 'en'} favicon={faviconUrl} />

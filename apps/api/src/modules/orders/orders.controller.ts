@@ -14,6 +14,7 @@ import { OrdersService } from './orders.service';
 import { successResponse, paginatedResponse } from '../../common/response.interface';
 import { AuthenticatedRequest } from '../../common/auth/authenticated-request.type';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
+import { MustChangePasswordGuard } from '../../common/auth/must-change-password.guard';
 
 const myOrdersQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional(),
@@ -34,7 +35,7 @@ export class OrdersController {
   constructor(private ordersService: OrdersService) {}
 
   @Post('orders')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), MustChangePasswordGuard)
   @ApiBearerAuth()
   async create(
     @Req() req: AuthenticatedRequest,
@@ -66,7 +67,7 @@ export class OrdersController {
   }
 
   @Post('orders/claim-reward-authenticated')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), MustChangePasswordGuard)
   @ApiBearerAuth()
   async claimRewardAuthenticated(
     @Req() req: AuthenticatedRequest,
@@ -77,7 +78,7 @@ export class OrdersController {
   }
 
   @Get('orders/my')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), MustChangePasswordGuard)
   @ApiBearerAuth()
   async myOrders(
     @Req() req: AuthenticatedRequest,
@@ -89,7 +90,7 @@ export class OrdersController {
   }
 
   @Get('orders/:id')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), MustChangePasswordGuard)
   @ApiBearerAuth()
   async findById(@Param('id') id: string) {
     const order = await this.ordersService.findById(id);

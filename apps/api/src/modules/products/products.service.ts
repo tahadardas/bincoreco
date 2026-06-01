@@ -24,6 +24,7 @@ export class ProductsService {
     isBestSeller?: boolean;
     isMaestroPick?: boolean;
     search?: string;
+    requireActiveCategory?: boolean;
   }) {
     const page = params.page || 1;
     const limit = params.limit || 20;
@@ -32,6 +33,9 @@ export class ProductsService {
     const where: Prisma.ProductWhereInput = { deletedAt: null };
     if (params.isActive !== undefined) where.isActive = params.isActive;
     if (params.categoryId) where.categoryId = params.categoryId;
+    if (params.requireActiveCategory) {
+      where.category = { isActive: true, deletedAt: null };
+    }
     if (params.type) where.type = params.type as ProductType;
     if (params.isBestSeller !== undefined) where.isBestSeller = params.isBestSeller;
     if (params.isMaestroPick !== undefined) where.isMaestroPick = params.isMaestroPick;
@@ -101,7 +105,12 @@ export class ProductsService {
 
   async findPublicById(id: string, locale?: string) {
     const product = await this.prisma.product.findFirst({
-      where: { id, isActive: true, deletedAt: null },
+      where: {
+        id,
+        isActive: true,
+        deletedAt: null,
+        category: { isActive: true, deletedAt: null },
+      },
       include: {
         translations: locale ? { where: { locale } } : true,
         images: { orderBy: { sortOrder: 'asc' } },
@@ -174,7 +183,7 @@ export class ProductsService {
             sortOrder: v.sortOrder ?? 0,
             prices: {
               create: v.prices.map(p => ({
-                currencyCode: p.currencyCode,
+                currencyCode: p.currencyCode.toUpperCase(),
                 amount: p.amount,
               })),
             },
@@ -323,11 +332,11 @@ export class ProductsService {
   }
 
   async getBestSellers(locale?: string, limit = 10) {
-    return this.findAll({ isBestSeller: true, locale, isActive: true, limit });
+    return this.findAll({ isBestSeller: true, locale, isActive: true, limit, requireActiveCategory: true });
   }
 
   async getMaestroPicks(locale?: string, limit = 10) {
-    return this.findAll({ isMaestroPick: true, locale, isActive: true, limit });
+    return this.findAll({ isMaestroPick: true, locale, isActive: true, limit, requireActiveCategory: true });
   }
 
   private async validateProductGrindOptions(type: ProductType, grindOptionIds?: string[]) {
@@ -374,7 +383,7 @@ export class ProductsService {
     }
 
     for (const variant of variants) {
-      const codes = variant.prices?.map(p => p.currencyCode) || [];
+      const codes = variant.prices?.map(p => p.currencyCode.toUpperCase()) || [];
       const uniqueCodes = new Set(codes);
       if (uniqueCodes.size !== codes.length) {
         throw new BadRequestException('لا يمكن تكرار نفس العملة في نفس الخيار');
@@ -388,7 +397,7 @@ export class ProductsService {
 
     const defaultCurrencyCode = await this.currenciesService.getDefaultCurrencyCode();
     for (const variant of variants) {
-      const codes = variant.prices?.map(p => p.currencyCode) || [];
+      const codes = variant.prices?.map(p => p.currencyCode.toUpperCase()) || [];
       if (!codes.includes(defaultCurrencyCode)) {
         throw new BadRequestException(
           `الخيار "${variant.name || 'بدون اسم'}" يجب أن يحتوي على سعر بالعملة الافتراضية (${defaultCurrencyCode})`,
@@ -429,20 +438,21 @@ export class ProductsService {
         });
 
         for (const priceInput of variantInput.prices || []) {
+          const currencyCode = priceInput.currencyCode.toUpperCase();
           const existingPrice = priceInput.id
             ? existingVariant.prices.find(p => p.id === priceInput.id)
-            : existingVariant.prices.find(p => p.currencyCode === priceInput.currencyCode);
+            : existingVariant.prices.find(p => p.currencyCode === currencyCode);
           if (priceInput.id && !existingPrice) {
             throw new BadRequestException('Price does not belong to this variant');
           }
           if (existingPrice) {
             await this.prisma.price.update({
               where: { id: existingPrice.id },
-              data: { currencyCode: priceInput.currencyCode, amount: priceInput.amount, isActive: true },
+              data: { currencyCode, amount: priceInput.amount, isActive: true },
             });
           } else {
             await this.prisma.price.create({
-              data: { productVariantId: variant.id, currencyCode: priceInput.currencyCode, amount: priceInput.amount, isActive: true },
+              data: { productVariantId: variant.id, currencyCode, amount: priceInput.amount, isActive: true },
             });
           }
         }
@@ -459,10 +469,11 @@ export class ProductsService {
         });
 
         for (const priceInput of variantInput.prices || []) {
+          const currencyCode = priceInput.currencyCode.toUpperCase();
           await this.prisma.price.create({
             data: {
               productVariantId: variant.id,
-              currencyCode: priceInput.currencyCode,
+              currencyCode,
               amount: priceInput.amount,
               isActive: true,
             },

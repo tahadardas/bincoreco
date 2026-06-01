@@ -9,7 +9,10 @@ import { RolesGuard } from '../../common/auth/roles.guard';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 
 const currencySchema = z.object({
-  code: z.string().min(1).max(10).transform(v => v.toUpperCase().trim()),
+  code: z.string()
+    .trim()
+    .transform(value => value.toUpperCase())
+    .pipe(z.string().length(3).regex(/^[A-Z]{3}$/)),
   name: z.string().min(1).max(100),
   nameAr: z.string().optional(),
   nameEn: z.string().optional(),

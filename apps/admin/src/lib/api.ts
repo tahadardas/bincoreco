@@ -30,6 +30,10 @@ export async function adminFetch<T>(endpoint: string, options: RequestInit = {})
     throw new Error('Unauthorized');
   }
   const data = await res.json();
+  if (res.status === 403 && typeof data.message === 'string' && data.message.includes('كلمة المرور')) {
+    if (typeof window !== 'undefined') window.location.href = '/change-password';
+    throw new Error(data.message);
+  }
   if (!data.success) throw new Error(data.message || 'API Error');
   return data.data;
 }

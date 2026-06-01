@@ -12,6 +12,15 @@ import * as uuid from 'uuid';
 import * as bcrypt from 'bcryptjs';
 import { JwtService } from '@nestjs/jwt';
 
+const VALID_ORDER_TRANSITIONS: Record<string, string[]> = {
+  PENDING: ['ACCEPTED', 'CANCELLED'],
+  ACCEPTED: ['PREPARING', 'CANCELLED'],
+  PREPARING: ['READY_FOR_PICKUP', 'CANCELLED'],
+  READY_FOR_PICKUP: ['PICKED_UP', 'CANCELLED'],
+  PICKED_UP: [],
+  CANCELLED: [],
+};
+
 @Injectable()
 export class OrdersService {
   constructor(
@@ -166,7 +175,7 @@ export class OrdersService {
     );
 
     return {
-      user: { id: user.id, email: user.email, phone: user.phone, fullName: user.fullName, role: user.role },
+      user: { id: user.id, email: user.email, phone: user.phone, fullName: user.fullName, role: user.role, mustChangePassword: user.mustChangePassword },
       accessToken,
       refreshToken,
       pendingCoins: order.pendingCoins,
@@ -351,24 +360,23 @@ export class OrdersService {
   }
 
   async updateStatus(id: string, status: string, reason?: string, changedBy?: string, auditContext?: AuditLogContext) {
-    const order = await this.findById(id);
-    const validTransitions: Record<string, string[]> = {
-      PENDING: ['ACCEPTED', 'CANCELLED'],
-      ACCEPTED: ['PREPARING', 'CANCELLED'],
-      PREPARING: ['READY_FOR_PICKUP', 'CANCELLED'],
-      READY_FOR_PICKUP: ['PICKED_UP', 'CANCELLED'],
-      PICKED_UP: [],
-      CANCELLED: [],
-    };
-
-    const allowed = validTransitions[order.status] || [];
-    if (!allowed.includes(status)) throw new BadRequestException(`Cannot transition from ${order.status} to ${status}`);
-
-    const updated = await this.prisma.$transaction(async tx => {
+    const result = await this.prisma.$transaction(async tx => {
       const current = await tx.order.findUnique({ where: { id } });
       if (!current) throw new NotFoundException('Order not found');
-      if (current.status !== order.status) {
-        throw new BadRequestException(`Order status changed from ${order.status} to ${current.status}. Reload and retry.`);
+
+      if (current.status === status) {
+        throw new BadRequestException(`Order is already ${status}`);
+      }
+
+      const allowed = VALID_ORDER_TRANSITIONS[current.status] || [];
+      if (!allowed.includes(status)) throw new BadRequestException(`Cannot transition from ${current.status} to ${status}`);
+
+      const write = await tx.order.updateMany({
+        where: { id, status: current.status },
+        data: { status: status as any, cancellationReason: status === 'CANCELLED' ? reason : undefined },
+      });
+      if (write.count !== 1) {
+        throw new BadRequestException('تم تحديث حالة الطلب من جلسة أخرى، حدّث الصفحة.');
       }
 
       await tx.orderStatusHistory.create({
@@ -381,17 +389,20 @@ export class OrdersService {
         },
       });
 
-      const nextOrder = await tx.order.update({
-        where: { id },
-        data: { status: status as any, cancellationReason: status === 'CANCELLED' ? reason : undefined },
-        include: { items: true, statusHistory: { orderBy: { createdAt: 'desc' } } },
-      });
-
       if (current.status !== 'PICKED_UP' && status === 'PICKED_UP' && current.customerId) {
         await this.awardPickupRewards(tx, current.customerId, id, current.orderNumber, current.total, current.currencyCode);
       }
 
-      return nextOrder;
+      const nextOrder = await tx.order.findUnique({
+        where: { id },
+        include: { items: true, statusHistory: { orderBy: { createdAt: 'desc' } } },
+      });
+
+      return {
+        beforeStatus: current.status,
+        beforeCancellationReason: current.cancellationReason,
+        order: nextOrder!,
+      };
     });
 
     await this.auditLogs.record({
@@ -400,11 +411,11 @@ export class OrdersService {
       action: AuditActions.ORDER_STATUS_CHANGED,
       entityType: 'Order',
       entityId: id,
-      beforeSnapshot: { status: order.status, cancellationReason: order.cancellationReason },
-      afterSnapshot: { status: updated.status, cancellationReason: updated.cancellationReason, reason },
+      beforeSnapshot: { status: result.beforeStatus, cancellationReason: result.beforeCancellationReason },
+      afterSnapshot: { status: result.order.status, cancellationReason: result.order.cancellationReason, reason },
     });
 
-    return updated;
+    return result.order;
   }
 
   private async awardPickupRewards(

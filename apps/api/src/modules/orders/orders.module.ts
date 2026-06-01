@@ -7,6 +7,7 @@ import { GuestCartModule } from '../guest-cart/guest-cart.module';
 import { LoyaltyModule } from '../loyalty/loyalty.module';
 import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 import { CurrenciesModule } from '../currencies/currencies.module';
+import { SecurityModule } from '../../common/auth/security.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { CurrenciesModule } from '../currencies/currencies.module';
     LoyaltyModule,
     AuditLogsModule,
     CurrenciesModule,
+    SecurityModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'banco-ricco-dev-secret',
       signOptions: { expiresIn: process.env.JWT_EXPIRATION || '15m' },

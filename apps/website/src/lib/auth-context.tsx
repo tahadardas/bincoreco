@@ -7,6 +7,8 @@ interface User {
   email: string | null;
   phone: string | null;
   fullName: string;
+  role?: string;
+  mustChangePassword?: boolean;
 }
 
 interface AuthContextType {
@@ -14,6 +16,7 @@ interface AuthContextType {
   token: string | null;
   login: (identifier: string, password: string) => Promise<void>;
   register: (input: { email?: string; phone?: string; password: string; fullName: string }) => Promise<void>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   logout: () => void;
   loading: boolean;
 }
@@ -69,6 +72,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('refreshToken', result.refreshToken);
   };
 
+  const changePassword = async (currentPassword: string, newPassword: string) => {
+    if (!token) {
+      throw new Error('Login is required');
+    }
+    await api.patch<null>('/auth/change-password', { currentPassword, newPassword }, token);
+    setUser(previous => previous ? { ...previous, mustChangePassword: false } : previous);
+  };
+
   const logout = () => {
     setUser(null);
     setToken(null);
@@ -77,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, register, logout, loading }}>
+    <AuthContext.Provider value={{ user, token, login, register, changePassword, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );

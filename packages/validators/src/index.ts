@@ -4,6 +4,11 @@ const dateTimeString = z.string().min(1).refine(value => !Number.isNaN(Date.pars
   message: 'Invalid date/time',
 });
 
+const currencyCodeSchema = z.string()
+  .trim()
+  .transform(value => value.toUpperCase())
+  .pipe(z.string().length(3).regex(/^[A-Z]{3}$/));
+
 export const registerSchema = z.object({
   email: z.string().email().optional(),
   phone: z.string().min(7).max(20).optional(),
@@ -82,7 +87,7 @@ export const createProductSchema = z.object({
     sortOrder: z.coerce.number().int().default(0),
     prices: z.array(z.object({
       id: z.string().uuid().optional(),
-      currencyCode: z.string().min(1).max(3).transform(value => value.toUpperCase()),
+      currencyCode: currencyCodeSchema,
       amount: z.coerce.number().positive(),
     })).min(1),
   })).min(1),
@@ -111,7 +116,7 @@ export const addCartItemSchema = z.object({
   productId: z.string().uuid(),
   variantId: z.string().uuid().optional(),
   quantity: z.coerce.number().int().positive().default(1),
-  currencyCode: z.string().min(1).max(3).transform(value => value.toUpperCase()).optional(),
+  currencyCode: currencyCodeSchema.optional(),
   selectedOptions: selectedOptionsSchema.optional(),
 });
 
@@ -121,7 +126,7 @@ export const updateCartItemSchema = z.object({
 
 export const createOrderSchema = z.object({
   pickupTime: dateTimeString,
-  currencyCode: z.string().min(1).max(3).transform(value => value.toUpperCase()).optional(),
+  currencyCode: currencyCodeSchema.optional(),
   notes: z.string().optional(),
 });
 
@@ -130,7 +135,7 @@ export const createGuestOrderSchema = z.object({
   guestName: z.string().min(1).max(200),
   guestPhone: z.string().min(7).max(20),
   pickupTime: dateTimeString,
-  currencyCode: z.string().min(1).max(3).transform(value => value.toUpperCase()).optional(),
+  currencyCode: currencyCodeSchema.optional(),
   notes: z.string().optional(),
 });
 

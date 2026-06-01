@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, Query, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query, Req, UseGuards, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { z } from 'zod';
@@ -63,6 +63,9 @@ export class ReviewsController {
     @Body(new ZodValidationPipe(createReviewSchema)) input: CreateReviewInput,
     @Req() req: any,
   ) {
+    if (req.user?.mustChangePassword) {
+      throw new ForbiddenException('يجب تغيير كلمة المرور قبل متابعة العملية');
+    }
     const userId = req.user?.id;
     const review = await this.reviewsService.create({
       productId,
