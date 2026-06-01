@@ -396,6 +396,21 @@ async function main() {
     update: {},
     create: { key: 'points_per_unit', value: '1000' },
   });
+  await prisma.setting.upsert({
+    where: { key: 'loyalty_points_base_currency' },
+    update: {},
+    create: { key: 'loyalty_points_base_currency', value: 'SYP' },
+  });
+  await prisma.setting.upsert({
+    where: { key: 'loyalty_points_per_amount_SYP' },
+    update: {},
+    create: { key: 'loyalty_points_per_amount_SYP', value: '1000' },
+  });
+  await prisma.setting.upsert({
+    where: { key: 'loyalty_points_per_amount_USD' },
+    update: {},
+    create: { key: 'loyalty_points_per_amount_USD', value: '1' },
+  });
   console.log('Settings created');
 
   console.log('Seeding complete!');

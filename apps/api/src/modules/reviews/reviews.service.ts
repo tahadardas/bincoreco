@@ -58,6 +58,7 @@ export class ReviewsService {
     comment?: string;
     guestName?: string;
     guestPhone?: string;
+    orderNumber?: string;
     source?: ReviewSource;
   }, auditContext?: AuditLogContext) {
     if (input.rating < 1 || input.rating > 5) {
@@ -65,10 +66,28 @@ export class ReviewsService {
     }
 
     const product = await this.prisma.product.findUnique({ where: { id: input.productId } });
-    if (!product || product.deletedAt) throw new NotFoundException('Product not found');
+    if (!product || product.deletedAt || !product.isActive) throw new NotFoundException('Product not found');
 
     let isVerifiedPurchase = false;
     let orderId = input.orderId;
+
+    if (input.orderNumber) {
+      const order = await this.prisma.order.findUnique({
+        where: { orderNumber: input.orderNumber },
+        include: { items: { select: { productId: true } } },
+      });
+      if (!order || !order.items.some(item => item.productId === input.productId)) {
+        throw new BadRequestException('Order number is not valid for this product');
+      }
+      if (input.userId && order.customerId && order.customerId !== input.userId) {
+        throw new ForbiddenException('Order does not belong to the authenticated user');
+      }
+      if (input.guestPhone && order.guestPhone && input.guestPhone !== order.guestPhone) {
+        throw new ForbiddenException('Guest phone does not match this order');
+      }
+      orderId = order.id;
+      isVerifiedPurchase = order.status === 'PICKED_UP';
+    }
 
     if (input.userId) {
       const paidOrder = await this.prisma.order.findFirst({
@@ -108,7 +127,36 @@ export class ReviewsService {
       afterSnapshot: { id: review.id, productId: input.productId, rating: input.rating },
     });
 
-    return review;
+    return this.toPublicReview(review);
+  }
+
+  private toPublicReview(review: {
+    id: string;
+    rating: number;
+    title: string | null;
+    comment: string | null;
+    guestName: string | null;
+    isVerifiedPurchase: boolean;
+    adminReply: string | null;
+    helpfulCount: number;
+    createdAt: Date;
+    userId?: string | null;
+    orderId?: string | null;
+    status?: ReviewStatus;
+    source?: ReviewSource;
+  }) {
+    return {
+      id: review.id,
+      rating: review.rating,
+      title: review.title,
+      comment: review.comment,
+      guestName: review.guestName,
+      isVerifiedPurchase: review.isVerifiedPurchase,
+      adminReply: review.adminReply,
+      helpfulCount: review.helpfulCount,
+      createdAt: review.createdAt,
+      status: review.status,
+    };
   }
 
   async adminFindAll(params: {

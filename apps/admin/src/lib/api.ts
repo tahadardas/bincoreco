@@ -1,11 +1,29 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+export function getAdminApiBaseUrl() {
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, '');
+  }
+  if (typeof window !== 'undefined') {
+    return `${window.location.protocol}//${window.location.hostname}:4000/api`;
+  }
+  return '/api';
+}
+
+export function getWebsiteBaseUrl() {
+  if (process.env.NEXT_PUBLIC_WEBSITE_URL) {
+    return process.env.NEXT_PUBLIC_WEBSITE_URL.replace(/\/$/, '');
+  }
+  if (typeof window !== 'undefined') {
+    return `${window.location.protocol}//${window.location.hostname}:3000`;
+  }
+  return '';
+}
 
 export async function adminFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = typeof window !== 'undefined' ? localStorage.getItem('admin_token') : null;
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const res = await fetch(`${API_URL}${endpoint}`, { ...options, headers });
+  const res = await fetch(`${getAdminApiBaseUrl()}${endpoint}`, { ...options, headers });
   if (res.status === 401) {
     localStorage.removeItem('admin_token');
     if (typeof window !== 'undefined') window.location.href = '/login';
@@ -20,7 +38,7 @@ export async function adminUpload(file: File, folder: string = 'products'): Prom
   const token = typeof window !== 'undefined' ? localStorage.getItem('admin_token') : null;
   const formData = new FormData();
   formData.append('file', file);
-  const res = await fetch(`${API_URL}/admin/media/upload?folder=${folder}`, {
+  const res = await fetch(`${getAdminApiBaseUrl()}/admin/media/upload?folder=${folder}`, {
     method: 'POST',
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: formData,

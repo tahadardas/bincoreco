@@ -1,9 +1,10 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { adminFetch, adminUpload } from '@/lib/api';
+import { adminFetch, adminUpload, getWebsiteBaseUrl } from '@/lib/api';
+import { resolveMediaUrl } from '@/lib/media';
 
-type ProductType = 'HOT_DRINK' | 'COLD_DRINK' | 'COFFEE_BEAN' | 'GROUND_COFFEE' | 'PACKAGE';
+type ProductType = 'HOT_DRINK' | 'COLD_DRINK' | 'COFFEE_BEAN' | 'GROUND_COFFEE' | 'PACKAGE' | 'SUBSCRIPTION' | 'GIFT_CARD';
 
 interface Category {
   id: string;
@@ -23,6 +24,7 @@ interface Currency {
   code: string;
   name: string;
   symbol: string;
+  isDefault: boolean;
   isActive: boolean;
 }
 
@@ -45,11 +47,13 @@ interface TranslationForm {
 }
 
 interface PriceForm {
+  id?: string;
   currencyCode: string;
   amount: number;
 }
 
 interface VariantForm {
+  id?: string;
   name: string;
   sizeValue: number | null;
   sizeUnit: string;
@@ -81,11 +85,17 @@ const productTypeLabels: Record<ProductType, string> = {
   COFFEE_BEAN: 'بن حب',
   GROUND_COFFEE: 'بن مطحون',
   PACKAGE: 'باقة',
+  SUBSCRIPTION: 'اشتراك',
+  GIFT_CARD: 'بطاقة هدية',
 };
 
 const productTypes = Object.keys(productTypeLabels) as ProductType[];
 
 const sizeUnits = ['ml', 'g', 'kg', 'cup', 'piece', 'bag'];
+
+function supportsGrindOptions(type: ProductType) {
+  return type === 'COFFEE_BEAN' || type === 'GROUND_COFFEE';
+}
 
 const emptyForm: ProductForm = {
   type: 'HOT_DRINK',
@@ -218,6 +228,7 @@ export default function ProductEditPage() {
           translations: normalizeTranslations(product.translations),
           variants: product.variants?.length
             ? product.variants.map((variant: any, index: number) => ({
+                id: variant.id,
                 name: variant.name,
                 sizeValue: variant.sizeValue ?? null,
                 sizeUnit: variant.sizeUnit || '',
@@ -225,6 +236,7 @@ export default function ProductEditPage() {
                 sortOrder: variant.sortOrder ?? index,
                 prices: variant.prices?.length
                   ? variant.prices.map((price: any) => ({
+                      id: price.id,
                       currencyCode: price.currencyCode,
                       amount: Number(price.amount) || 0,
                     }))
@@ -309,7 +321,7 @@ export default function ProductEditPage() {
     try {
       const productId = params.id!;
       await adminFetch(`/admin/products/${productId}/images/${img.id}/primary`, { method: 'PATCH' });
-      const product = await adminFetch<any>(`/products/${productId}`);
+      const product = await adminFetch<any>(`/admin/products/${productId}`);
       setForm(prev => ({
         ...prev,
         images: (product.images || []).map((i: any) => ({
@@ -336,7 +348,7 @@ export default function ProductEditPage() {
     try {
       const productId = params.id!;
       await adminFetch(`/admin/products/${productId}/images/${img.id}`, { method: 'DELETE' });
-      const product = await adminFetch<any>(`/products/${productId}`);
+      const product = await adminFetch<any>(`/admin/products/${productId}`);
       setForm(prev => ({
         ...prev,
         images: (product.images || []).map((i: any) => ({
@@ -368,16 +380,52 @@ export default function ProductEditPage() {
     if (form.variants.length < 2) return;
     const basePrices = form.variants[0].prices;
     const updatedVariants = form.variants.map((v, i) =>
-      i === 0 ? v : { ...v, prices: basePrices.map(p => ({ ...p })) },
+      i === 0 ? v : { ...v, prices: basePrices.map(p => ({ currencyCode: p.currencyCode, amount: p.amount })) },
     );
     setForm({ ...form, variants: updatedVariants });
   };
 
   const save = async () => {
     setError(null);
+    const defaultCurrency = currencies.find(currency => currency.isDefault && currency.isActive)
+      || currencies.find(currency => currency.code === 'SYP' && currency.isActive)
+      || currencies.find(currency => currency.isActive);
+    if (!form.sku.trim()) {
+      setError('SKU مطلوب');
+      return;
+    }
     if (!form.categoryId) {
       setError('اختر تصنيف المنتج أولاً');
       return;
+    }
+    if (!form.translations.some(translation => translation.name.trim())) {
+      setError('اسم المنتج مطلوب بالعربية أو الإنكليزية');
+      return;
+    }
+    if (form.variants.length === 0) {
+      setError('أضف خيار حجم واحد على الأقل');
+      return;
+    }
+    for (const [variantIndex, variant] of form.variants.entries()) {
+      if (!variant.name.trim()) {
+        setError(`اسم الخيار رقم ${variantIndex + 1} مطلوب`);
+        return;
+      }
+      if (!variant.prices.length) {
+        setError(`الخيار "${variant.name}" يجب أن يحتوي على سعر واحد على الأقل`);
+        return;
+      }
+      for (const [priceIndex, price] of variant.prices.entries()) {
+        const priceError = getPriceError(variant, priceIndex, currencies);
+        if (priceError) {
+          setError(`الخيار "${variant.name}": ${priceError}`);
+          return;
+        }
+      }
+      if (defaultCurrency && !variant.prices.some(price => price.currencyCode === defaultCurrency.code)) {
+        setError(`الخيار "${variant.name}" يجب أن يحتوي على سعر بالعملة الافتراضية (${defaultCurrency.code})`);
+        return;
+      }
     }
 
     setSaving(true);
@@ -385,12 +433,14 @@ export default function ProductEditPage() {
       const body = {
         ...form,
         imageUrl: form.imageUrl || undefined,
-        grindOptionIds: (form.type === 'COFFEE_BEAN' || form.type === 'GROUND_COFFEE') ? form.grindOptionIds : [],
+        grindOptionIds: supportsGrindOptions(form.type) ? form.grindOptionIds : [],
         variants: form.variants.map(variant => ({
+          id: variant.id,
           ...variant,
           sizeValue: variant.sizeValue || undefined,
           sizeUnit: variant.sizeUnit || undefined,
           prices: variant.prices.map(price => ({
+            id: price.id,
             currencyCode: price.currencyCode.toUpperCase(),
             amount: Number(price.amount) || 0,
           })),
@@ -418,7 +468,7 @@ export default function ProductEditPage() {
     <div dir="rtl">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
         <div>
-          <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 6 }}>
+          <h1 className="admin-page-title" style={{ marginBottom: 6 }}>
             {isNew ? 'إضافة منتج جديد' : 'تعديل المنتج'}
           </h1>
           <p style={{ color: 'var(--br-muted)', fontSize: 14 }}>بيانات الكتالوج والأسعار وخيارات البن.</p>
@@ -430,18 +480,21 @@ export default function ProductEditPage() {
 
       {error && <div className="card" style={{ color: 'var(--br-danger)', marginBottom: 16, padding: 12 }}>{error}</div>}
 
-      <div style={{ display: 'grid', gap: 20, marginBottom: 80 }}>
+      <div className="admin-product-editor" style={{ marginBottom: 80 }}>
         {/* Section 1: Basic Info */}
-        <section className="card" style={{ padding: 20 }}>
-          <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, color: 'var(--br-gold-dark)' }}>معلومات المنتج</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(180px, 1fr))', gap: 16 }}>
+        <section className="card admin-product-section">
+          <h2 className="admin-section-title">معلومات المنتج</h2>
+          <div className="admin-form-grid">
             <label style={{ fontWeight: 600, fontSize: 14 }}>
               SKU
               <input className="input" style={{ marginTop: 6 }} value={form.sku} onChange={event => setForm({ ...form, sku: event.target.value })} />
             </label>
             <label style={{ fontWeight: 600, fontSize: 14 }}>
               النوع
-              <select className="input" style={{ marginTop: 6 }} value={form.type} onChange={event => setForm({ ...form, type: event.target.value as ProductType, grindOptionIds: event.target.value === 'COFFEE_BEAN' ? form.grindOptionIds : [] })}>
+              <select className="input" style={{ marginTop: 6 }} value={form.type} onChange={event => {
+                const nextType = event.target.value as ProductType;
+                setForm({ ...form, type: nextType, grindOptionIds: supportsGrindOptions(nextType) ? form.grindOptionIds : [] });
+              }}>
                 {productTypes.map(productType => (
                   <option key={productType} value={productType}>{productTypeLabels[productType]}</option>
                 ))}
@@ -482,13 +535,13 @@ export default function ProductEditPage() {
         </section>
 
         {/* Section 2: Product Images */}
-        <section className="card" style={{ padding: 20 }}>
+        <section className="card admin-product-section">
           <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 6, color: 'var(--br-gold-dark)' }}>صور المنتج</h2>
           <p style={{ color: 'var(--br-muted)', fontSize: 13, marginBottom: 16 }}>يفضل صورة مربعة أو بنسبة 4:3 وبخلفية نظيفة. الصورة الأولى تصبح الرئيسية.</p>
-          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 14, alignItems: 'flex-start' }}>
+          <div className="admin-image-grid" style={{ marginBottom: 14 }}>
             {form.images.map((img, index) => (
               <div key={index} style={{ position: 'relative', width: 120, borderRadius: 8, overflow: 'hidden', border: img.isPrimary ? '3px solid var(--br-gold)' : '1px solid var(--br-line)' }}>
-                <img src={img.url} alt="" style={{ width: 120, height: 120, objectFit: 'cover', display: 'block' }} />
+                <img src={resolveMediaUrl(img.url) || ''} alt="" style={{ width: 120, height: 120, objectFit: 'cover', display: 'block' }} />
                 {img.isPrimary && <span style={{ position: 'absolute', top: 4, right: 4, background: 'var(--br-gold)', color: '#fff', fontSize: 10, fontWeight: 800, padding: '2px 6px', borderRadius: 4 }}>أساسية</span>}
                 <div style={{ display: 'flex', gap: 4, padding: 4 }}>
                   {!img.isPrimary && <button className="btn btn-sm" style={{ flex: 1, fontSize: 11, padding: '3px 0', background: 'var(--br-cream)' }} onClick={() => setPrimaryImage(index)}>رئيسية</button>}
@@ -509,9 +562,9 @@ export default function ProductEditPage() {
         </section>
 
         {/* Section 3: Translations */}
-        <section className="card" style={{ padding: 20 }}>
+        <section className="card admin-product-section">
           <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, color: 'var(--br-gold-dark)' }}>الترجمات والقصة</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(260px, 1fr))', gap: 16 }}>
+          <div className="admin-grid-2">
             {form.translations.map((translation, index) => (
               <div key={translation.locale} style={{ background: 'var(--br-cream)', borderRadius: 8, padding: 16 }}>
                 <h3 style={{ fontSize: 16, color: 'var(--br-gold)', marginBottom: 12 }}>
@@ -529,7 +582,7 @@ export default function ProductEditPage() {
         </section>
 
         {/* Section 4: Sizes and Prices */}
-        <section className="card" style={{ padding: 20 }}>
+        <section className="card admin-product-section">
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 16 }}>
             <h2 style={{ fontSize: 20, fontWeight: 700 }}>الأحجام والأسعار</h2>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -557,7 +610,7 @@ export default function ProductEditPage() {
 
               return (
                 <div key={variantIndex} style={{ background: '#fafafa', borderRadius: 8, padding: 16 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(100px, 1fr))', gap: 8 }}>
+                  <div className="admin-variant-grid">
                     <select className="input" value={sizeOptionSelections[variantIndex] || ''} onChange={e => handleSizeOptionChange(variantIndex, e.target.value)}>
                       <option value="">قالب الحجم</option>
                       {sizeOptions.filter(o => o.isActive).map(option => (
@@ -577,6 +630,16 @@ export default function ProductEditPage() {
                       <input type="checkbox" checked={variant.isActive} onChange={e => updateVariant(variantIndex, { isActive: e.target.checked })} />
                       نشط
                     </label>
+                    {variant.isActive && (
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        style={{ background: '#fee', color: 'var(--br-danger)' }}
+                        onClick={() => updateVariant(variantIndex, { isActive: false })}
+                      >
+                        تعطيل هذا الحجم
+                      </button>
+                    )}
                   </div>
 
                   <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
@@ -584,7 +647,7 @@ export default function ProductEditPage() {
                       const priceError = getPriceError(variant, priceIndex, currencies);
                       return (
                         <div key={priceIndex}>
-                          <div style={{ display: 'grid', gridTemplateColumns: '140px minmax(160px, 1fr) auto', gap: 10 }}>
+                          <div className="admin-price-grid">
                             <select className="input" value={price.currencyCode} onChange={e => updatePrice(variantIndex, priceIndex, { currencyCode: e.target.value })}>
                               <option value="">اختر العملة</option>
                               {currencies.filter(c => c.isActive).map(c => (
@@ -651,15 +714,15 @@ export default function ProductEditPage() {
           </div>
         </section>
 
-        {(form.type === 'COFFEE_BEAN' || form.type === 'GROUND_COFFEE') && (
-          <section className="card" style={{ padding: 20 }}>
+        {supportsGrindOptions(form.type) && (
+          <section className="card admin-product-section">
             <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8, color: 'var(--br-gold-dark)' }}>خيارات الطحن المتاحة</h2>
             <p style={{ color: 'var(--br-muted)', fontSize: 13, marginBottom: 16 }}>
               {form.type === 'GROUND_COFFEE'
                 ? 'لبيع البن مطحوناً، اختر طرق الطحن المتاحة لهذا المنتج.'
                 : 'خيار Whole Bean يختاره العميل من نوع البن، أما الطرق التالية فهي للبن المطحون فقط.'}
             </p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
+            <div className="admin-grid-responsive" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
               {coffeeBeanGrindOptions.map(option => {
                 const selected = form.grindOptionIds.includes(option.id);
                 return (
@@ -685,12 +748,7 @@ export default function ProductEditPage() {
       </div>
 
       {/* Sticky Save Bar */}
-      <div style={{
-        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100,
-        background: 'rgba(255, 250, 240, 0.96)', borderTop: '1px solid var(--br-line)',
-        padding: '12px 24px', display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'flex-end',
-        backdropFilter: 'blur(8px)',
-      }}>
+      <div className="admin-sticky-actions">
         <button onClick={save} disabled={saving} className="btn btn-primary" style={{ minWidth: 120 }}>
           {saving ? 'جاري الحفظ...' : isNew ? 'إضافة المنتج' : 'حفظ التغييرات'}
         </button>
@@ -698,7 +756,7 @@ export default function ProductEditPage() {
           إلغاء
         </button>
         {!isNew && (
-          <button onClick={() => window.open(`http://localhost:3000/ar/products/${params.id}`, '_blank')} className="btn btn-outline" style={{ marginInlineEnd: 'auto' }}>
+          <button onClick={() => window.open(`${getWebsiteBaseUrl()}/ar/products/${params.id}`, '_blank')} className="btn btn-outline" style={{ marginInlineEnd: 'auto' }}>
             معاينة
           </button>
         )}

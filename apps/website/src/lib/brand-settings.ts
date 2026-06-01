@@ -1,4 +1,5 @@
 import { resolveMediaUrl } from './media';
+import { getApiBaseUrl } from './api';
 
 export interface PublicBrandSettings {
   brand_logo_main: string | null;
@@ -24,11 +25,9 @@ export const defaultBrandSettings: PublicBrandSettings = {
   brand_pattern_opacity: null,
 };
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-
 export async function getPublicBrandSettings(): Promise<PublicBrandSettings> {
   try {
-    const res = await fetch(`${API_URL}/settings/public-brand`, {
+    const res = await fetch(`${getApiBaseUrl()}/settings/public-brand`, {
       cache: 'no-store',
     });
     if (!res.ok) return { ...defaultBrandSettings };

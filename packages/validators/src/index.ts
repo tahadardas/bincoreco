@@ -39,8 +39,18 @@ export const createCategorySchema = z.object({
 
 export const updateCategorySchema = createCategorySchema.partial();
 
+export const productTypeSchema = z.enum([
+  'HOT_DRINK',
+  'COLD_DRINK',
+  'COFFEE_BEAN',
+  'GROUND_COFFEE',
+  'PACKAGE',
+  'SUBSCRIPTION',
+  'GIFT_CARD',
+]);
+
 export const createProductSchema = z.object({
-  type: z.enum(['HOT_DRINK', 'COLD_DRINK', 'COFFEE_BEAN', 'GROUND_COFFEE', 'PACKAGE']),
+  type: productTypeSchema,
   sku: z.string().min(1).max(50),
   categoryId: z.string().uuid(),
   isActive: z.boolean().default(true),
@@ -64,12 +74,14 @@ export const createProductSchema = z.object({
     microStory: z.string().optional(),
   })).min(1),
   variants: z.array(z.object({
+    id: z.string().uuid().optional(),
     name: z.string().min(1).max(100),
     sizeValue: z.coerce.number().positive().optional(),
     sizeUnit: z.string().optional(),
     isActive: z.boolean().default(true),
     sortOrder: z.coerce.number().int().default(0),
     prices: z.array(z.object({
+      id: z.string().uuid().optional(),
       currencyCode: z.string().min(1).max(3).transform(value => value.toUpperCase()),
       amount: z.coerce.number().positive(),
     })).min(1),

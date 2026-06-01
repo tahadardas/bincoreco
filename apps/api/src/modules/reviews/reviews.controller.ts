@@ -9,6 +9,7 @@ import { RolesGuard } from '../../common/auth/roles.guard';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { AuthenticatedRequest } from '../../common/auth/authenticated-request.type';
 import { getAuditContext } from '../../common/audit/audit-context';
+import { OptionalJwtAuthGuard } from '../../common/auth/optional-jwt-auth.guard';
 
 const createReviewSchema = z.object({
   rating: z.coerce.number().int().min(1).max(5),
@@ -56,6 +57,7 @@ export class ReviewsController {
   }
 
   @Post('products/:productId/reviews')
+  @UseGuards(OptionalJwtAuthGuard)
   async create(
     @Param('productId') productId: string,
     @Body(new ZodValidationPipe(createReviewSchema)) input: CreateReviewInput,
@@ -70,6 +72,7 @@ export class ReviewsController {
       comment: input.comment,
       guestName: input.guestName,
       guestPhone: input.guestPhone,
+      orderNumber: input.orderNumber,
     });
     return successResponse(review, 'Review submitted successfully');
   }

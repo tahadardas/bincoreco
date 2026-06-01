@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { ProductType } from '@prisma/client';
 import { CartService } from './cart.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { CurrenciesService } from '../currencies/currencies.service';
 
 function createPrismaMock(product: unknown) {
   return {
@@ -47,7 +48,8 @@ const coffeeBeanProduct = {
 describe('CartService grind validation', () => {
   it('rejects ground coffee bean items without a grind option', async () => {
     const prisma = createPrismaMock(coffeeBeanProduct);
-    const service = new CartService(prisma);
+    const currenciesService = { getDefaultCurrencyCode: jest.fn().mockResolvedValue('SYP') } as unknown as CurrenciesService;
+    const service = new CartService(prisma, currenciesService);
 
     await expect(service.addItem('customer-1', {
       productId: 'product-1',
@@ -59,7 +61,8 @@ describe('CartService grind validation', () => {
 
   it('accepts ground coffee bean items with an active product grind option', async () => {
     const prisma = createPrismaMock(coffeeBeanProduct);
-    const service = new CartService(prisma);
+    const currenciesService = { getDefaultCurrencyCode: jest.fn().mockResolvedValue('SYP') } as unknown as CurrenciesService;
+    const service = new CartService(prisma, currenciesService);
 
     await service.addItem('customer-1', {
       productId: 'product-1',

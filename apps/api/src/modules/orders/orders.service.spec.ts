@@ -6,6 +6,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CartService } from '../cart/cart.service';
 import { GuestCartService } from '../guest-cart/guest-cart.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
+import { CurrenciesService } from '../currencies/currencies.service';
 
 function createOrderService(cart: unknown) {
   const prisma = {
@@ -31,11 +32,12 @@ function createOrderService(cart: unknown) {
 
   const guestCartService = {} as unknown as GuestCartService;
   const loyaltyService = {} as unknown as LoyaltyService;
+  const currenciesService = { getDefaultCurrencyCode: jest.fn().mockResolvedValue('SYP') } as unknown as CurrenciesService;
   const auditLogs = { record: jest.fn().mockResolvedValue(undefined) };
   const jwtService = new JwtService({ secret: 'test' });
 
   return {
-    service: new OrdersService(prisma, cartService, guestCartService, loyaltyService, auditLogs as any, jwtService),
+    service: new OrdersService(prisma, cartService, guestCartService, loyaltyService, auditLogs as any, currenciesService, jwtService),
     prisma,
   };
 }

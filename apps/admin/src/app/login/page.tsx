@@ -4,8 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { loginSchema } from '@/lib/forms';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+import { getAdminApiBaseUrl } from '@/lib/api';
 
 type LoginForm = { email: string; password: string };
 
@@ -19,7 +18,7 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginForm) => {
     setError('');
     try {
-      const res = await fetch(`${API_URL}/auth/admin/login`, {
+      const res = await fetch(`${getAdminApiBaseUrl()}/auth/admin/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),

@@ -7,6 +7,7 @@ import { GuestCartService } from '../guest-cart/guest-cart.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
 import { AuditActions, AuditLogContext } from '../audit-logs/audit-log.types';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { CurrenciesService } from '../currencies/currencies.service';
 import * as uuid from 'uuid';
 import * as bcrypt from 'bcryptjs';
 import { JwtService } from '@nestjs/jwt';
@@ -19,6 +20,7 @@ export class OrdersService {
     private guestCartService: GuestCartService,
     private loyaltyService: LoyaltyService,
     private auditLogs: AuditLogsService,
+    private currenciesService: CurrenciesService,
     private jwtService: JwtService,
   ) {}
 
@@ -59,7 +61,7 @@ export class OrdersService {
     const orderNumber = this.generateOrderNumber();
     const rewardClaimToken = uuid.v4().replace(/-/g, '').substring(0, 24);
 
-    const points = Math.floor(this.decimalToNumber(subtotal) / 1000);
+    const points = await this.loyaltyService.calculateLoyaltyPoints(subtotal, currencyCode);
 
     const order = await this.prisma.order.create({
       data: {
@@ -219,7 +221,7 @@ export class OrdersService {
     items: any[],
     currencyCode: string,
   ) {
-    const resolvedCurrency = currencyCode || await this.getSettingValue('default_currency', 'SYP');
+    const resolvedCurrency = currencyCode || await this.currenciesService.getDefaultCurrencyCode();
     let subtotal = new Prisma.Decimal(0);
     const orderItems: Prisma.OrderItemUncheckedCreateWithoutOrderInput[] = [];
 
@@ -362,31 +364,35 @@ export class OrdersService {
     const allowed = validTransitions[order.status] || [];
     if (!allowed.includes(status)) throw new BadRequestException(`Cannot transition from ${order.status} to ${status}`);
 
-    await this.prisma.orderStatusHistory.create({
-      data: {
-        orderId: id,
-        fromStatus: order.status as any,
-        toStatus: status as any,
-        changedBy,
-        reason,
-      },
-    });
-
-    const updated = await this.prisma.order.update({
-      where: { id },
-      data: { status: status as any, cancellationReason: status === 'CANCELLED' ? reason : undefined },
-      include: { items: true, statusHistory: { orderBy: { createdAt: 'desc' } } },
-    });
-
-    if (status === 'PICKED_UP') {
-      const points = Math.floor(this.decimalToNumber(updated.total) / 1000);
-      if (order.customerId) {
-        if (points > 0) {
-          await this.loyaltyService.awardPoints(order.customerId, points, `Order ${order.orderNumber}`, id);
-        }
-        await this.loyaltyService.awardStamp(order.customerId, id);
+    const updated = await this.prisma.$transaction(async tx => {
+      const current = await tx.order.findUnique({ where: { id } });
+      if (!current) throw new NotFoundException('Order not found');
+      if (current.status !== order.status) {
+        throw new BadRequestException(`Order status changed from ${order.status} to ${current.status}. Reload and retry.`);
       }
-    }
+
+      await tx.orderStatusHistory.create({
+        data: {
+          orderId: id,
+          fromStatus: current.status,
+          toStatus: status as any,
+          changedBy,
+          reason,
+        },
+      });
+
+      const nextOrder = await tx.order.update({
+        where: { id },
+        data: { status: status as any, cancellationReason: status === 'CANCELLED' ? reason : undefined },
+        include: { items: true, statusHistory: { orderBy: { createdAt: 'desc' } } },
+      });
+
+      if (current.status !== 'PICKED_UP' && status === 'PICKED_UP' && current.customerId) {
+        await this.awardPickupRewards(tx, current.customerId, id, current.orderNumber, current.total, current.currencyCode);
+      }
+
+      return nextOrder;
+    });
 
     await this.auditLogs.record({
       ...auditContext,
@@ -399,6 +405,79 @@ export class OrdersService {
     });
 
     return updated;
+  }
+
+  private async awardPickupRewards(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    orderId: string,
+    orderNumber: string,
+    total: Prisma.Decimal,
+    currencyCode: string,
+  ) {
+    const existingEarn = await tx.loyaltyTransaction.findFirst({
+      where: { orderId, type: 'EARN' },
+    });
+    const existingStamp = await tx.loyaltyTransaction.findFirst({
+      where: { orderId, type: 'STAMP' },
+    });
+
+    if (existingEarn && existingStamp) return;
+
+    const user = await tx.user.findUnique({ where: { id: userId } });
+    if (!user || user.role !== 'customer') return;
+
+    const profile = await tx.customerProfile.upsert({
+      where: { userId },
+      update: {},
+      create: { userId },
+    });
+    const account = await tx.loyaltyAccount.upsert({
+      where: { customerId: profile.id },
+      update: {},
+      create: { customerId: profile.id },
+    });
+
+    if (!existingEarn) {
+      const points = await this.loyaltyService.calculateLoyaltyPoints(total, currencyCode);
+      if (points > 0) {
+        await tx.loyaltyAccount.update({
+          where: { id: account.id },
+          data: {
+            balance: { increment: points },
+            lifetimeEarned: { increment: points },
+          },
+        });
+        await tx.loyaltyTransaction.create({
+          data: {
+            loyaltyAccountId: account.id,
+            type: 'EARN',
+            points,
+            reason: `Order ${orderNumber}`,
+            orderId,
+          },
+        });
+      }
+    }
+
+    if (!existingStamp) {
+      await tx.loyaltyAccount.update({
+        where: { id: account.id },
+        data: {
+          stampCount: { increment: 1 },
+          stampTotalEarned: { increment: 1 },
+        },
+      });
+      await tx.loyaltyTransaction.create({
+        data: {
+          loyaltyAccountId: account.id,
+          type: 'STAMP',
+          points: 1,
+          reason: 'New stamp earned',
+          orderId,
+        },
+      });
+    }
   }
 
   private async validatePickupAvailability(
@@ -451,7 +530,14 @@ export class OrdersService {
       };
     }
 
-    const grindType = selectedOptions.grindType || 'whole_bean';
+    const grindType = item.product.type === ProductType.GROUND_COFFEE
+      ? 'ground'
+      : selectedOptions.grindType || 'whole_bean';
+
+    if (item.product.type === ProductType.GROUND_COFFEE && selectedOptions.grindType && selectedOptions.grindType !== 'ground') {
+      throw new BadRequestException('Ground coffee requires a grind option');
+    }
+
     if (grindType === 'whole_bean') {
       const snapshot: Record<string, unknown> = { ...selectedOptions, grindType: 'whole_bean' };
       delete snapshot.grindOptionId;

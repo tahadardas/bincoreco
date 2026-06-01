@@ -70,6 +70,8 @@ export default function CartPage() {
   const minimumPickup = useMemo(() => toDatetimeLocal(new Date(Date.now() + 15 * 60_000)), []);
 
   useEffect(() => {
+    const handleCartCleared = () => setItems([]);
+    window.addEventListener('banco-cart-cleared', handleCartCleared);
     if (!isGuest) {
       api.get<any>('/cart', token).then(cart => {
         setItems(cart.items || []);
@@ -80,6 +82,7 @@ export default function CartPage() {
         setItems(cart.items || []);
       }).catch(() => {}).finally(() => setLoading(false));
     }
+    return () => window.removeEventListener('banco-cart-cleared', handleCartCleared);
   }, [token, sessionId, isGuest]);
 
   const removeItem = async (itemId: string) => {
@@ -118,6 +121,7 @@ export default function CartPage() {
           guestName: guestInfo.name,
           guestPhone: guestInfo.phone,
           pickupTime: new Date(pickupTime).toISOString(),
+          currencyCode: selectedCurrency.code,
           notes: notes || undefined,
         });
         setRewardModal({
@@ -130,14 +134,14 @@ export default function CartPage() {
       } else {
         const order = await api.post<any>('/orders', {
           pickupTime: new Date(pickupTime).toISOString(),
+          currencyCode: selectedCurrency.code,
           notes: notes || undefined,
         }, token);
-        const pendingCoins = Math.floor(total / 1000);
         setRewardModal({
           id: order.id,
           orderNumber: order.orderNumber,
-          pendingCoins,
-          pendingStamps: 1,
+          pendingCoins: order.pendingCoins || 0,
+          pendingStamps: order.pendingStamps || 0,
         });
       }
     } catch (err) {
@@ -148,9 +152,12 @@ export default function CartPage() {
   };
 
   const total = items.reduce((sum, item) => {
-    const selectedPrice = item.variant?.prices.find(p => p.currencyCode === (selectedCurrency?.code || 'SYP')) || item.variant?.prices[0];
+    const selectedPrice = item.variant?.prices.find(p => p.currencyCode === selectedCurrency.code);
     return sum + toMoneyNumber(selectedPrice?.amount) * item.quantity;
   }, 0);
+  const unavailableItems = items.filter(item =>
+    !item.variant?.prices.some(price => price.currencyCode === selectedCurrency.code),
+  );
 
   if (loading) return <div className="page-shell" style={{ textAlign: 'center' }}>Loading...</div>;
 
@@ -173,7 +180,7 @@ export default function CartPage() {
           <div className="checkout-grid">
             <div style={{ display: 'grid', gap: 14 }}>
               {items.map(item => {
-    const selectedPrice = item.variant?.prices.find(p => p.currencyCode === (selectedCurrency?.code || 'SYP')) || item.variant?.prices[0];
+    const selectedPrice = item.variant?.prices.find(p => p.currencyCode === selectedCurrency.code);
                 const grind = grindLabel(item, locale);
                 return (
                   <div key={item.id} className="card" style={{ padding: 18 }}>
@@ -185,7 +192,11 @@ export default function CartPage() {
                         <div style={{ fontSize: 14, color: 'var(--br-muted)' }}>{dict.product.quantity}: {item.quantity}</div>
                       </div>
                       <div style={{ textAlign: 'end' }}>
-                        <div className="money">{formatMoney(toMoneyNumber(selectedPrice?.amount) * item.quantity, selectedCurrency || 'SYP')}</div>
+                        <div className="money">
+                          {selectedPrice
+                            ? formatMoney(toMoneyNumber(selectedPrice.amount) * item.quantity, selectedCurrency)
+                            : (locale === 'ar' ? 'غير متاح بهذه العملة' : 'Unavailable in this currency')}
+                        </div>
                         <button onClick={() => removeItem(item.id)} style={{ background: 'none', color: 'var(--br-danger)', fontSize: 13, marginTop: 6 }}>
                           {dict.cart.remove}
                         </button>
@@ -198,7 +209,14 @@ export default function CartPage() {
 
             <aside className="card" style={{ padding: 22 }}>
               <div style={{ fontSize: 15, color: 'var(--br-muted)' }}>{dict.cart.total}</div>
-              <div style={{ fontSize: 32, fontWeight: 900, color: 'var(--br-gold-dark)', marginBottom: 18 }}>{formatMoney(total, selectedCurrency || 'SYP')}</div>
+              <div style={{ fontSize: 32, fontWeight: 900, color: 'var(--br-gold-dark)', marginBottom: 18 }}>{formatMoney(total, selectedCurrency)}</div>
+              {unavailableItems.length > 0 && (
+                <div style={{ color: 'var(--br-danger)', fontWeight: 800, fontSize: 14, marginBottom: 16 }}>
+                  {locale === 'ar'
+                    ? `يوجد ${unavailableItems.length} عنصر غير مسعر بعملة ${selectedCurrency.code}.`
+                    : `${unavailableItems.length} item(s) are not priced in ${selectedCurrency.code}.`}
+                </div>
+              )}
 
               {isGuest && showGuestForm && (
                 <>
@@ -230,7 +248,7 @@ export default function CartPage() {
 
               <div style={{ color: 'var(--br-muted)', fontSize: 13, marginBottom: 18 }}>{dict.cart.cashOnly}</div>
 
-              <EspressoButton onClick={placeOrder} disabled={ordering || !isPickupValid} loading={ordering} style={{ width: '100%' }}>
+              <EspressoButton onClick={placeOrder} disabled={ordering || !isPickupValid || unavailableItems.length > 0} loading={ordering} style={{ width: '100%' }}>
                 {dict.cart.placeOrder}
               </EspressoButton>
             </aside>

@@ -1,4 +1,12 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+export function getApiBaseUrl() {
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, '');
+  }
+  if (typeof window !== 'undefined') {
+    return `${window.location.protocol}//${window.location.hostname}:4000/api`;
+  }
+  return '/api';
+}
 
 interface FetchOptions extends RequestInit {
   token?: string | null;
@@ -38,7 +46,7 @@ async function apiFetch<T>(endpoint: string, options: FetchOptions & { token?: s
 
   let res: Response;
   try {
-    res = await fetch(`${API_URL}${endpoint}`, {
+    res = await fetch(`${getApiBaseUrl()}${endpoint}`, {
       ...fetchOptions,
       headers,
     });

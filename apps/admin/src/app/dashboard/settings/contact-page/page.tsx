@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { adminFetch } from '@/lib/api';
+import { adminFetch, getWebsiteBaseUrl } from '@/lib/api';
 
 interface Section {
   title: string;
@@ -74,7 +74,7 @@ function getAllKeys(): string[] {
   return keys;
 }
 
-const websiteUrl = process.env.NEXT_PUBLIC_WEBSITE_URL || (typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:3000` : 'http://localhost:3000');
+const websiteUrl = getWebsiteBaseUrl();
 
 export default function ContactPageSettings() {
   const [values, setValues] = useState<Record<string, string>>({});

@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { adminFetch } from '@/lib/api';
+import { adminFetch, getWebsiteBaseUrl } from '@/lib/api';
 
 interface Section {
   title: string;
@@ -63,7 +63,7 @@ const locales = ['ar', 'en'] as const;
 type Locale = (typeof locales)[number];
 const localeLabel: Record<Locale, string> = { ar: 'عربي', en: 'English' };
 
-const websiteUrl = process.env.NEXT_PUBLIC_WEBSITE_URL || (typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:3000` : 'http://localhost:3000');
+const websiteUrl = getWebsiteBaseUrl();
 
 export default function AboutPageSettings() {
   const [values, setValues] = useState<Record<string, string>>({});

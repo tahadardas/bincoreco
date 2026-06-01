@@ -1,5 +1,5 @@
 'use client';
-import { createContext, useContext, ReactNode, useState, useEffect, useCallback } from 'react';
+import { createContext, useCallback, useContext, ReactNode, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 
 interface Currency {
@@ -14,52 +14,60 @@ interface Currency {
 }
 
 interface CurrencyContextType {
-  selectedCurrency: Currency | null;
-  setSelectedCurrency: (c: Currency) => void;
+  selectedCurrency: Currency;
+  setSelectedCurrency: (currency: Currency) => void;
   currencies: Currency[];
   loading: boolean;
 }
 
-const CurrencyContext = createContext<CurrencyContextType | null>(null);
-
 const FALLBACK_CURRENCY: Currency = {
   code: 'SYP',
   name: 'Syrian Pound',
+  nameAr: 'ليرة سورية',
+  nameEn: 'Syrian Pound',
   symbol: 'ل.س',
   isDefault: true,
   isActive: true,
   sortOrder: 0,
 };
 
+const CurrencyContext = createContext<CurrencyContextType | null>(null);
+
 export function CurrencyProvider({ children }: { children: ReactNode }) {
-  const [currencies, setCurrencies] = useState<Currency[]>([]);
-  const [selectedCurrency, setSelectedCurrencyState] = useState<Currency | null>(null);
+  const [currencies, setCurrencies] = useState<Currency[]>([FALLBACK_CURRENCY]);
+  const [selectedCurrency, setSelectedCurrencyState] = useState<Currency>(FALLBACK_CURRENCY);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     api.get<Currency[]>('/currencies')
-      .then(setCurrencies)
-      .catch(() => setCurrencies([]))
+      .then(items => {
+        const activeItems = items.filter(item => item.isActive);
+        setCurrencies(activeItems.length ? activeItems : [FALLBACK_CURRENCY]);
+      })
+      .catch(() => {
+        setCurrencies([FALLBACK_CURRENCY]);
+        setSelectedCurrencyState(FALLBACK_CURRENCY);
+      })
       .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
-    if (currencies.length === 0) return;
     const savedCode = localStorage.getItem('br_currency');
     if (savedCode) {
-      const found = currencies.find(c => c.code === savedCode);
+      const found = currencies.find(currency => currency.code === savedCode);
       if (found) {
         setSelectedCurrencyState(found);
         return;
       }
     }
-    const defaultCurrency = currencies.find(c => c.isDefault);
+
+    const defaultCurrency = currencies.find(currency => currency.isDefault);
     setSelectedCurrencyState(defaultCurrency || currencies[0] || FALLBACK_CURRENCY);
   }, [currencies]);
 
-  const setSelectedCurrency = useCallback((c: Currency) => {
-    setSelectedCurrencyState(c);
-    localStorage.setItem('br_currency', c.code);
+  const setSelectedCurrency = useCallback((currency: Currency) => {
+    setSelectedCurrencyState(currency);
+    localStorage.setItem('br_currency', currency.code);
   }, []);
 
   return (
@@ -70,7 +78,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
 }
 
 export function useCurrency() {
-  const ctx = useContext(CurrencyContext);
-  if (!ctx) throw new Error('useCurrency must be used within CurrencyProvider');
-  return ctx;
+  const context = useContext(CurrencyContext);
+  if (!context) throw new Error('useCurrency must be used within CurrencyProvider');
+  return context;
 }

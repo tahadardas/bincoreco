@@ -1,4 +1,5 @@
 'use client';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
@@ -14,11 +15,33 @@ export default function Header({ brandMark }: HeaderProps) {
   const locale = (params.locale as Locale) || 'ar';
   const dict = getDictionary(locale);
   const { user, logout } = useAuth();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const closeMenu = () => setMenuOpen(false);
+  const navLinks = [
+    { href: `/${locale}`, label: dict.nav.home },
+    { href: `/${locale}/products`, label: dict.nav.products },
+    { href: `/${locale}/about`, label: dict.nav.about },
+    { href: `/${locale}/contact`, label: dict.nav.contact },
+    { href: `/${locale}/cart`, label: dict.nav.cart },
+    ...(user ? [
+      { href: `/${locale}/orders`, label: dict.nav.orders },
+      { href: `/${locale}/loyalty`, label: dict.nav.loyalty },
+    ] : []),
+  ];
+
+  const authControl = user ? (
+    <button onClick={() => { logout(); closeMenu(); }}>{dict.nav.logout}</button>
+  ) : (
+    <Link href={`/${locale}/?login=1`} className="lang-switch" onClick={closeMenu}>
+      {dict.nav.login}
+    </Link>
+  );
 
   return (
     <header className="br-header">
       <div className="container br-header__inner">
-        <Link href={`/${locale}`} className="br-brand" aria-label="Banco Ricco">
+        <Link href={`/${locale}`} className="br-brand" aria-label="Banco Ricco" onClick={closeMenu}>
           <img
             src={brandMark || '/brand/br-monogram.png'}
             alt=""
@@ -29,25 +52,40 @@ export default function Header({ brandMark }: HeaderProps) {
             <span className="br-brand__subtitle">{dict.home.respectBeans}</span>
           </span>
         </Link>
+        <button
+          className="br-menu-toggle"
+          type="button"
+          aria-label={menuOpen ? 'Close navigation' : 'Open navigation'}
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen(open => !open)}
+        >
+          <span />
+          <span />
+          <span />
+        </button>
         <nav className="br-nav" aria-label="Main navigation">
-          <Link href={`/${locale}`}>{dict.nav.home}</Link>
-          <Link href={`/${locale}/products`}>{dict.nav.products}</Link>
-          <Link href={`/${locale}/about`}>{dict.nav.about}</Link>
-          <Link href={`/${locale}/contact`}>{dict.nav.contact}</Link>
-          <Link href={`/${locale}/cart`}>{dict.nav.cart}</Link>
-          {user && <Link href={`/${locale}/orders`}>{dict.nav.orders}</Link>}
-          {user && <Link href={`/${locale}/loyalty`}>{dict.nav.loyalty}</Link>}
+          {navLinks.map(link => (
+            <Link key={link.href} href={link.href}>{link.label}</Link>
+          ))}
           <CurrencySwitcher />
           <Link href={`/${locale === 'ar' ? 'en' : 'ar'}`} className="lang-switch">
             {locale === 'ar' ? 'EN' : 'AR'}
           </Link>
-          {user ? (
-            <button onClick={logout}>{dict.nav.logout}</button>
-          ) : (
-            <Link href={`/${locale}/?login=1`} className="lang-switch">
-              {dict.nav.login}
+          {authControl}
+        </nav>
+      </div>
+      <div className={`br-mobile-drawer ${menuOpen ? 'is-open' : ''}`}>
+        <nav className="br-mobile-drawer__nav" aria-label="Mobile navigation">
+          {navLinks.map(link => (
+            <Link key={link.href} href={link.href} onClick={closeMenu}>{link.label}</Link>
+          ))}
+          <div className="br-mobile-drawer__controls">
+            <CurrencySwitcher className="lang-switch br-mobile-select" />
+            <Link href={`/${locale === 'ar' ? 'en' : 'ar'}`} className="lang-switch" onClick={closeMenu}>
+              {locale === 'ar' ? 'EN' : 'AR'}
             </Link>
-          )}
+            {authControl}
+          </div>
         </nav>
       </div>
     </header>

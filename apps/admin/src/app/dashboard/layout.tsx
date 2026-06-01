@@ -8,6 +8,25 @@ interface AdminUser {
   role?: string;
 }
 
+const links = [
+  { href: '/dashboard', label: 'الرئيسية', icon: 'DB' },
+  { href: '/dashboard/orders', label: 'الطلبات', icon: 'OR' },
+  { href: '/dashboard/products', label: 'المنتجات', icon: 'PR' },
+  { href: '/dashboard/categories', label: 'التصنيفات', icon: 'CA' },
+  { href: '/dashboard/grind-options', label: 'خيارات الطحن', icon: 'GR' },
+  { href: '/dashboard/members', label: 'الأعضاء', icon: 'MB' },
+  { href: '/dashboard/reviews', label: 'التقييمات', icon: 'RV' },
+  { href: '/dashboard/contact-messages', label: 'رسائل التواصل', icon: 'CM' },
+  { href: '/dashboard/loyalty', label: 'الولاء', icon: 'BR' },
+  { href: '/dashboard/currencies', label: 'العملات', icon: 'FX' },
+  { href: '/dashboard/banners', label: 'البنرات', icon: 'BN' },
+  { href: '/dashboard/reports', label: 'التقارير', icon: 'RP' },
+  { href: '/dashboard/settings/brand', label: 'العلامة التجارية', icon: 'ID' },
+  { href: '/dashboard/settings/about-page', label: 'صفحة من نحن', icon: 'AB' },
+  { href: '/dashboard/settings/contact-page', label: 'صفحة اتصل بنا', icon: 'CT' },
+  { href: '/dashboard/settings/experience', label: 'التجربة', icon: 'EX' },
+];
+
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -30,25 +49,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     localStorage.removeItem('admin_user');
     router.push('/login');
   };
-
-  const links = [
-    { href: '/dashboard', label: 'الرئيسية', icon: '📊' },
-    { href: '/dashboard/orders', label: 'الطلبات', icon: '📋' },
-    { href: '/dashboard/products', label: 'المنتجات', icon: '🫘' },
-    { href: '/dashboard/categories', label: 'التصنيفات', icon: '🏷️' },
-    { href: '/dashboard/grind-options', label: 'خيارات الطحن', icon: '⚙️' },
-    { href: '/dashboard/members', label: 'الأعضاء', icon: '👥' },
-    { href: '/dashboard/reviews', label: 'التقييمات', icon: '⭐' },
-    { href: '/dashboard/contact-messages', label: 'رسائل التواصل', icon: '✉️' },
-    { href: '/dashboard/loyalty', label: 'الولاء', icon: '🎖️' },
-    { href: '/dashboard/currencies', label: 'العملات', icon: '💰' },
-    { href: '/dashboard/banners', label: 'البنرات', icon: '🖼️' },
-    { href: '/dashboard/reports', label: 'التقارير', icon: '📈' },
-    { href: '/dashboard/settings/brand', label: 'العلامة التجارية', icon: '🎨' },
-    { href: '/dashboard/settings/about-page', label: 'صفحة من نحن', icon: '📖' },
-    { href: '/dashboard/settings/contact-page', label: 'صفحة اتصل بنا', icon: '📞' },
-    { href: '/dashboard/settings/experience', label: 'التجربة', icon: '✨' },
-  ];
 
   return (
     <div className="admin-shell" dir="rtl">

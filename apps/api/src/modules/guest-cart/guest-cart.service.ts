@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { Prisma, ProductType } from '@prisma/client';
 import { AddCartItemInput } from '@banco-ricco/validators';
 import { PrismaService } from '../prisma/prisma.service';
+import { CurrenciesService } from '../currencies/currencies.service';
 
 const cartProductInclude = Prisma.validator<Prisma.ProductInclude>()({
   translations: true,
@@ -13,7 +14,10 @@ type CartProduct = Prisma.ProductGetPayload<{ include: typeof cartProductInclude
 
 @Injectable()
 export class GuestCartService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private currenciesService: CurrenciesService,
+  ) {}
 
   async getCart(sessionId: string) {
     let cart = await this.prisma.guestCart.findUnique({
@@ -31,7 +35,7 @@ export class GuestCartService {
     });
 
     if (!cart) {
-      const currencyCode = await this.getSettingValue('default_currency', 'SYP');
+      const currencyCode = await this.currenciesService.getDefaultCurrencyCode();
       cart = await this.prisma.guestCart.create({
         data: { sessionId, currencyCode },
         include: { items: { include: { product: { include: cartProductInclude }, variant: { include: { prices: true } } } } },
@@ -56,7 +60,7 @@ export class GuestCartService {
       throw new BadRequestException('Selected variant is not available for this product');
     }
 
-    const currencyCode = input.currencyCode || cart.currencyCode || await this.getSettingValue('default_currency', 'SYP');
+    const currencyCode = input.currencyCode || cart.currencyCode || await this.currenciesService.getDefaultCurrencyCode();
     const hasActivePrice = selectedVariant.prices.some(p => p.currencyCode === currencyCode && p.isActive);
     if (!hasActivePrice) {
       const productName = product.translations[0]?.name || product.sku;
@@ -64,6 +68,9 @@ export class GuestCartService {
     }
 
     if (cart.currencyCode !== currencyCode) {
+      if (cart.items.length > 0) {
+        throw new BadRequestException(`Cart already uses ${cart.currencyCode}. Clear the cart before switching to ${currencyCode}.`);
+      }
       await this.prisma.guestCart.update({
         where: { id: cart.id },
         data: { currencyCode },
@@ -134,11 +141,6 @@ export class GuestCartService {
     await this.prisma.guestCartItem.deleteMany({ where: { guestCartId: cart.id } });
   }
 
-  private async getSettingValue(key: string, fallback: string) {
-    const setting = await this.prisma.setting.findUnique({ where: { key } });
-    return setting?.value || fallback;
-  }
-
   private validateAndNormalizeSelectedOptions(
     product: CartProduct,
     selectedOptions?: AddCartItemInput['selectedOptions'],
@@ -152,7 +154,14 @@ export class GuestCartService {
       return Object.keys(selected).length ? selected as Prisma.InputJsonValue : undefined;
     }
 
-    const grindType = selected.grindType || 'whole_bean';
+    const grindType = product.type === ProductType.GROUND_COFFEE
+      ? 'ground'
+      : selected.grindType || 'whole_bean';
+
+    if (product.type === ProductType.GROUND_COFFEE && selected.grindType && selected.grindType !== 'ground') {
+      throw new BadRequestException('Ground coffee requires a grind option');
+    }
+
     if (grindType === 'whole_bean') {
       delete selected.grindOptionId;
       delete selected.grindOptionNameAr;

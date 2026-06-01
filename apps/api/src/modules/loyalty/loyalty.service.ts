@@ -100,6 +100,26 @@ export class LoyaltyService {
     });
   }
 
+  async calculateLoyaltyPoints(orderTotal: number | string | { toNumber: () => number }, currencyCode: string) {
+    const total = typeof orderTotal === 'object' && orderTotal && 'toNumber' in orderTotal
+      ? orderTotal.toNumber()
+      : Number(orderTotal);
+    if (!Number.isFinite(total) || total <= 0) return 0;
+
+    const normalizedCurrency = currencyCode.toUpperCase();
+    const perCurrencySetting = await this.prisma.setting.findUnique({
+      where: { key: `loyalty_points_per_amount_${normalizedCurrency}` },
+    });
+    const legacySetting = normalizedCurrency === 'SYP'
+      ? await this.prisma.setting.findUnique({ where: { key: 'points_per_unit' } })
+      : null;
+    const fallbackAmount = normalizedCurrency === 'USD' ? 1 : 1000;
+    const pointsPerAmount = Number(perCurrencySetting?.value || legacySetting?.value || fallbackAmount);
+
+    if (!Number.isFinite(pointsPerAmount) || pointsPerAmount <= 0) return 0;
+    return Math.max(0, Math.floor(total / pointsPerAmount));
+  }
+
   async awardStamp(userId: string, orderId: string) {
     const profile = await this.getOrCreateCustomerProfile(userId);
     const account = await this.getOrCreateAccount(profile.id);

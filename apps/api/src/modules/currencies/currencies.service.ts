@@ -24,28 +24,77 @@ export class CurrenciesService {
     return currency;
   }
 
+  async getDefaultCurrencyCode() {
+    const defaultCurrency = await this.prisma.currency.findFirst({
+      where: { isDefault: true, isActive: true },
+      orderBy: { sortOrder: 'asc' },
+    });
+    if (defaultCurrency) return defaultCurrency.code;
+
+    const activeCurrency = await this.prisma.currency.findFirst({
+      where: { isActive: true },
+      orderBy: { sortOrder: 'asc' },
+    });
+    if (activeCurrency) return activeCurrency.code;
+
+    const legacySetting = await this.prisma.setting.findUnique({ where: { key: 'default_currency' } });
+    return legacySetting?.value || 'SYP';
+  }
+
   async create(data: { code: string; name: string; nameAr?: string; nameEn?: string; symbol: string; isDefault?: boolean; isActive?: boolean; sortOrder?: number }) {
     const code = data.code.toUpperCase().trim();
     const existing = await this.prisma.currency.findUnique({ where: { code } });
     if (existing) throw new ConflictException('Currency already exists');
 
-    if (data.isDefault) {
-      await this.clearDefault();
+    if (data.isDefault && data.isActive === false) {
+      throw new BadRequestException('Default currency must be active');
     }
 
-    return this.prisma.currency.create({
-      data: { ...data, code },
+    return this.prisma.$transaction(async tx => {
+      if (data.isDefault) {
+        await tx.currency.updateMany({
+          where: { isDefault: true },
+          data: { isDefault: false },
+        });
+      }
+
+      return tx.currency.create({
+        data: {
+          ...data,
+          code,
+          isActive: data.isDefault ? true : data.isActive,
+        },
+      });
     });
   }
 
   async update(code: string, data: { name?: string; nameAr?: string; nameEn?: string; symbol?: string; isDefault?: boolean; isActive?: boolean; sortOrder?: number }) {
-    await this.findByCode(code);
-    if (data.isDefault) {
-      await this.clearDefault();
+    const existing = await this.findByCode(code);
+    if (existing.isDefault && data.isActive === false) {
+      throw new BadRequestException('Cannot deactivate the default currency');
     }
-    return this.prisma.currency.update({
-      where: { code },
-      data,
+    if (data.isDefault === false && existing.isDefault) {
+      throw new BadRequestException('Assign another default currency before unsetting this one');
+    }
+    if (data.isDefault && data.isActive === false) {
+      throw new BadRequestException('Default currency must be active');
+    }
+
+    return this.prisma.$transaction(async tx => {
+      if (data.isDefault) {
+        await tx.currency.updateMany({
+          where: { isDefault: true, code: { not: code } },
+          data: { isDefault: false },
+        });
+      }
+
+      return tx.currency.update({
+        where: { code },
+        data: {
+          ...data,
+          isActive: data.isDefault ? true : data.isActive,
+        },
+      });
     });
   }
 
@@ -64,12 +113,5 @@ export class CurrenciesService {
     }
     await this.prisma.currency.delete({ where: { code } });
     return { message: 'Currency deleted' };
-  }
-
-  private async clearDefault() {
-    await this.prisma.currency.updateMany({
-      where: { isDefault: true },
-      data: { isDefault: false },
-    });
   }
 }

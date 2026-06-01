@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { adminFetch, adminUpload } from '@/lib/api';
+import { adminFetch, adminUpload, getAdminApiBaseUrl, getWebsiteBaseUrl } from '@/lib/api';
 import { resolveMediaUrl } from '@/lib/media';
 
 interface BrandSettings {
@@ -29,7 +29,7 @@ const fields = [
 
 const previewKeys = ['brand_mark', 'brand_favicon', 'brand_footer_logo'] as const;
 
-const websiteUrl = process.env.NEXT_PUBLIC_WEBSITE_URL || (typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:3000` : 'http://localhost:3000');
+const websiteUrl = getWebsiteBaseUrl();
 
 export default function BrandSettingsPage() {
   const [settings, setSettings] = useState<BrandSettings>({});
@@ -96,7 +96,7 @@ export default function BrandSettingsPage() {
     setTestResult(null);
     setError(null);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+      const apiUrl = getAdminApiBaseUrl();
       const res = await fetch(`${apiUrl}/settings/public-brand`);
       const json = await res.json();
       if (json.success) {

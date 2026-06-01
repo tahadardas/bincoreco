@@ -1,5 +1,5 @@
 'use client';
-import { formatMoney, MoneyAmount } from '@/lib/money';
+import { CurrencyInfo, formatMoney, MoneyAmount } from '@/lib/money';
 
 interface SizeOption {
   id: string;
@@ -13,7 +13,7 @@ interface CupSizeSelectorProps {
   options: SizeOption[];
   selectedId: string;
   onSelect: (id: string) => void;
-  currencyCode?: string;
+  currency?: CurrencyInfo;
 }
 
 function CupSVG({ size, selected }: { size: 'S' | 'M' | 'L'; selected: boolean }) {
@@ -38,13 +38,14 @@ function CupSVG({ size, selected }: { size: 'S' | 'M' | 'L'; selected: boolean }
   );
 }
 
-export default function CupSizeSelector({ options, selectedId, onSelect, currencyCode = 'SYP' }: CupSizeSelectorProps) {
+export default function CupSizeSelector({ options, selectedId, onSelect, currency }: CupSizeSelectorProps) {
   const getSize = (index: number) => index === 0 ? 'S' : index === 1 ? 'M' : 'L';
+  const currencyCode = currency?.code || 'SYP';
 
   return (
     <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
       {options.map((option, index) => {
-        const price = option.prices.find(p => p.currencyCode === currencyCode) || option.prices[0];
+        const price = option.prices.find(p => p.currencyCode === currencyCode);
         const selected = option.id === selectedId;
         return (
           <button
@@ -73,7 +74,7 @@ export default function CupSizeSelector({ options, selectedId, onSelect, currenc
                 fontSize: 15, fontWeight: 900, marginTop: 6,
                 color: selected ? 'var(--br-gold-dark)' : 'var(--br-coffee)',
               }}>
-                {formatMoney(price.amount, price.currencyCode)}
+                {formatMoney(price.amount, currency || price.currencyCode)}
               </div>
             )}
           </button>

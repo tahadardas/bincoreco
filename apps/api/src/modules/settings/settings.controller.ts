@@ -42,23 +42,6 @@ export class SettingsController {
     return successResponse(data);
   }
 
-  @Put('admin/settings/:key')
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('admin', 'maestro')
-  @ApiBearerAuth()
-  async update(
-    @Param('key') key: string,
-    @Body(new ZodValidationPipe(updateSettingSchema)) input: UpdateSettingInput,
-    @Req() req: AuthenticatedRequest,
-  ) {
-    if (input.value) {
-      await this.settingsService.set(key, input.value, getAuditContext(req));
-    } else {
-      await this.settingsService.remove(key, getAuditContext(req));
-    }
-    return successResponse(null, 'Setting updated');
-  }
-
   @Put('admin/settings/batch')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('admin', 'maestro')
@@ -75,6 +58,23 @@ export class SettingsController {
       }
     }
     return successResponse(null, 'Settings updated');
+  }
+
+  @Put('admin/settings/:key')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin', 'maestro')
+  @ApiBearerAuth()
+  async update(
+    @Param('key') key: string,
+    @Body(new ZodValidationPipe(updateSettingSchema)) input: UpdateSettingInput,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    if (input.value) {
+      await this.settingsService.set(key, input.value, getAuditContext(req));
+    } else {
+      await this.settingsService.remove(key, getAuditContext(req));
+    }
+    return successResponse(null, 'Setting updated');
   }
 
   @Delete('admin/settings/:key')

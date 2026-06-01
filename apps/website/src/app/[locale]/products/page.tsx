@@ -96,7 +96,10 @@ export default function ProductsPage() {
               <option value="HOT_DRINK">{locale === 'ar' ? 'مشروبات ساخنة' : 'Hot drinks'}</option>
               <option value="COLD_DRINK">{locale === 'ar' ? 'مشروبات باردة' : 'Cold drinks'}</option>
               <option value="COFFEE_BEAN">{locale === 'ar' ? 'بن' : 'Coffee beans'}</option>
+              <option value="GROUND_COFFEE">{locale === 'ar' ? 'بن مطحون' : 'Ground coffee'}</option>
               <option value="PACKAGE">{locale === 'ar' ? 'باقات' : 'Packages'}</option>
+              <option value="SUBSCRIPTION">{locale === 'ar' ? 'اشتراكات' : 'Subscriptions'}</option>
+              <option value="GIFT_CARD">{locale === 'ar' ? 'بطاقات هدية' : 'Gift cards'}</option>
             </select>
             <button
               className={`btn ${featuredOnly ? 'btn-primary' : 'btn-outline'}`}

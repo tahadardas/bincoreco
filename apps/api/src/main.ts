@@ -2,7 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { join } from 'path';
+import { resolve } from 'path';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
@@ -11,15 +11,18 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
 
-  const allowedOrigins = process.env.ALLOWED_ORIGINS || 'http://localhost:3000,http://localhost:3001,http://localhost:5173';
+  const allowedOrigins = process.env.ALLOWED_ORIGINS || '';
   app.enableCors({
-    origin: allowedOrigins.split(',').map(s => s.trim()),
+    origin: allowedOrigins ? allowedOrigins.split(',').map(s => s.trim()).filter(Boolean) : true,
     credentials: true,
   });
 
   app.useGlobalFilters(new HttpExceptionFilter());
 
-  app.useStaticAssets(join(process.cwd(), '../../uploads'), {
+  const uploadDir = process.env.UPLOAD_DIR
+    ? resolve(process.env.UPLOAD_DIR)
+    : resolve(process.cwd(), '../../uploads');
+  app.useStaticAssets(uploadDir, {
     prefix: '/uploads/',
   });
 
@@ -34,7 +37,10 @@ async function bootstrap() {
 
   const port = process.env.API_PORT || 4000;
 
-  if (process.env.ENABLE_SWAGGER !== 'false') {
+  const swaggerEnabled = process.env.NODE_ENV === 'production'
+    ? process.env.ENABLE_SWAGGER === 'true'
+    : process.env.ENABLE_SWAGGER !== 'false';
+  if (swaggerEnabled) {
     const config = new DocumentBuilder()
       .setTitle('Banco Ricco API')
       .setDescription('Banco Ricco Digital Platform API')
@@ -44,11 +50,11 @@ async function bootstrap() {
 
     const document = SwaggerModule.createDocument(app, config);
     SwaggerModule.setup('api/docs', app, document);
-    console.log(`Swagger docs at http://localhost:${port}/api/docs`);
+    console.log(`Swagger docs enabled at /api/docs`);
   }
 
   await app.listen(port);
-  console.log(`Banco Ricco API running on http://localhost:${port}/api`);
+  console.log(`Banco Ricco API running on port ${port} with /api prefix`);
 }
 
 bootstrap();

@@ -37,7 +37,7 @@ function translated(product: ProductSummary, locale: Locale) {
 
 function price(product: ProductSummary, currency: { code: string; symbol: string }) {
   const item = product.variants[0]?.prices.find(value => value.currencyCode === currency.code);
-  return item ? formatMoney(item.amount, currency) : '';
+  return item ? formatMoney(item.amount, currency) : null;
 }
 
 function fallbackLetters(product: ProductSummary, locale: Locale) {
@@ -52,6 +52,7 @@ export default function ProductCard({ product, locale, labels }: ProductCardProp
   const description = t?.shortDescription || '';
   const brand = useBrand();
   const { selectedCurrency } = useCurrency();
+  const selectedPrice = selectedCurrency ? price(product, selectedCurrency) : null;
 
   return (
     <article className="card product-card">
@@ -72,7 +73,9 @@ export default function ProductCard({ product, locale, labels }: ProductCardProp
         <h3 className="product-card__title">{name}</h3>
         <p className="product-card__desc">{description}</p>
         <div className="product-card__footer">
-          <span className="money">{selectedCurrency ? price(product, selectedCurrency) : ''}</span>
+          <span className="money">
+            {selectedPrice || (locale === 'ar' ? 'غير متاح بهذه العملة' : 'Unavailable in this currency')}
+          </span>
           <EspressoButton size="small" onClick={() => router.push(`/${locale}/products/${product.id}`)}>
             {labels.view}
           </EspressoButton>

@@ -115,11 +115,12 @@ export default function ProductDetailPage() {
   }, [locale, product]);
 
   const variant = product?.variants.find(item => item.id === selectedVariant) || product?.variants[0];
-  const selectedPrice = variant?.prices.find(price => price.currencyCode === (selectedCurrency?.code || 'SYP')) || variant?.prices[0];
+  const selectedPrice = variant?.prices.find(price => price.currencyCode === selectedCurrency.code);
+  const priceUnavailable = Boolean(variant && !selectedPrice);
 
   const handleAddToCart = async () => {
     if (!product) return;
-    if (needsGrindSelection) return;
+    if (needsGrindSelection || priceUnavailable || noGrindOptionsAvailable) return;
 
     if (!token) {
       const sessionId = getGuestSession();
@@ -142,7 +143,7 @@ export default function ProductDetailPage() {
           productId: product.id,
           variantId: selectedVariant || undefined,
           quantity,
-          currencyCode: selectedCurrency?.code || 'SYP',
+          currencyCode: selectedCurrency.code,
           selectedOptions,
         });
         setAdded(true);
@@ -175,7 +176,7 @@ export default function ProductDetailPage() {
         productId: product.id,
         variantId: selectedVariant || undefined,
         quantity,
-        currencyCode: selectedCurrency?.code || 'SYP',
+          currencyCode: selectedCurrency.code,
         selectedOptions,
       }, token);
       setAdded(true);
@@ -304,7 +305,7 @@ export default function ProductDetailPage() {
                   options={product.variants}
                   selectedId={selectedVariant}
                   onSelect={setSelectedVariant}
-                  currencyCode="SYP"
+                  currency={selectedCurrency}
                 />
               </div>
             )}
@@ -430,8 +431,15 @@ export default function ProductDetailPage() {
               <div>
                 <div style={{ color: 'var(--br-muted)', fontSize: 13 }}>{dict.product.price}</div>
                 <div style={{ fontSize: 30, fontWeight: 900, color: 'var(--br-gold-dark)' }}>
-                  {selectedPrice ? formatMoney(selectedPrice.amount, selectedCurrency || selectedPrice.currencyCode) : ''}
+                  {selectedPrice ? formatMoney(selectedPrice.amount, selectedCurrency) : ''}
                 </div>
+                {priceUnavailable && (
+                  <div style={{ color: 'var(--br-danger)', fontSize: 13, fontWeight: 800, marginTop: 6 }}>
+                    {locale === 'ar'
+                      ? `هذا المنتج غير مسعر بعملة ${selectedCurrency.code}.`
+                      : `This product is not priced in ${selectedCurrency.code}.`}
+                  </div>
+                )}
               </div>
               <div className="quantity-control">
                 <button onClick={() => setQuantity(Math.max(1, quantity - 1))}>-</button>
@@ -448,7 +456,7 @@ export default function ProductDetailPage() {
 
             <EspressoButton
               onClick={handleAddToCart}
-              disabled={needsGrindSelection}
+              disabled={needsGrindSelection || priceUnavailable || noGrindOptionsAvailable}
               loading={adding}
               size="large"
             >
