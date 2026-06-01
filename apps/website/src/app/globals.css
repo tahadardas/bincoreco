@@ -16,9 +16,12 @@
   --br-warning: #b26a00;
   --br-danger: #b42318;
   --br-shadow: 0 18px 48px rgba(27, 16, 11, 0.13);
-  --br-pattern-opacity: 0.08;
+  --br-brand-pattern-url: url('/brand/banco-arabesque-pattern.svg');
+  --br-brand-pattern-opacity: 0.1;
+  --br-brand-pattern-size: 420px;
+  --br-pattern-opacity: var(--br-brand-pattern-opacity);
   --br-pattern-color: rgba(201, 150, 26, 0.6);
-  --br-pattern-size: 400px;
+  --br-pattern-size: var(--br-brand-pattern-size);
 }
 
 * {
@@ -107,20 +110,29 @@ body {
   position: relative;
 }
 
-body::before {
+.site-shell {
+  position: relative;
+  min-height: 100vh;
+  isolation: isolate;
+  overflow: clip;
+}
+
+.site-shell::before {
   content: '';
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 0;
   background-image: var(--br-brand-pattern-url, url('/brand/banco-arabesque-pattern.svg'));
-  background-size: var(--br-pattern-size) var(--br-pattern-size);
+  background-size: var(--br-brand-pattern-size, var(--br-pattern-size)) var(--br-brand-pattern-size, var(--br-pattern-size));
   background-repeat: repeat;
-  opacity: var(--br-pattern-opacity);
+  background-position: center top;
+  opacity: var(--br-brand-pattern-opacity, var(--br-pattern-opacity));
   color: var(--br-pattern-color);
+  mix-blend-mode: multiply;
 }
 
-body > * {
+.site-shell > * {
   position: relative;
   z-index: 1;
 }
@@ -158,7 +170,24 @@ img {
 }
 
 .page-shell {
+  position: relative;
   padding: 34px 0 72px;
+}
+
+.page-pattern-surface,
+.section-transparent-shell {
+  position: relative;
+}
+
+.section-transparent-shell {
+  padding: 64px 0;
+  background: transparent;
+}
+
+.section-soft-surface {
+  position: relative;
+  padding: 64px 0;
+  background: rgba(255, 250, 240, 0.36);
 }
 
 .premium-pattern-section {
@@ -172,9 +201,9 @@ img {
   pointer-events: none;
   z-index: 0;
   background-image: var(--br-brand-pattern-url, url('/brand/banco-arabesque-pattern.svg'));
-  background-size: var(--br-pattern-size) var(--br-pattern-size);
+  background-size: var(--br-brand-pattern-size, var(--br-pattern-size)) var(--br-brand-pattern-size, var(--br-pattern-size));
   background-repeat: repeat;
-  opacity: calc(var(--br-pattern-opacity) * 1.6);
+  opacity: calc(var(--br-brand-pattern-opacity, var(--br-pattern-opacity)) * 1.45);
   color: var(--br-pattern-color);
 }
 
@@ -194,8 +223,8 @@ img {
   display: grid;
   place-items: center;
   background:
-    linear-gradient(135deg, rgba(27, 16, 11, 0.92), rgba(75, 46, 30, 0.84)),
-    var(--br-brand-pattern-url, repeating-linear-gradient(45deg, rgba(201, 150, 26, 0.11) 0 1px, transparent 1px 12px));
+    radial-gradient(circle at 50% 32%, rgba(201, 150, 26, 0.2), transparent 28%),
+    linear-gradient(135deg, rgba(27, 16, 11, 0.94), rgba(75, 46, 30, 0.86));
   color: var(--br-gold-light);
   font-weight: 800;
   font-size: 13px;
@@ -768,8 +797,8 @@ img {
   place-items: center;
   overflow: hidden;
   background:
-    linear-gradient(135deg, rgba(27, 16, 11, 0.92), rgba(75, 46, 30, 0.84)),
-    var(--br-brand-pattern-url, repeating-linear-gradient(45deg, rgba(201, 150, 26, 0.11) 0 1px, transparent 1px 12px));
+    radial-gradient(circle at 50% 28%, rgba(201, 150, 26, 0.22), transparent 28%),
+    linear-gradient(135deg, rgba(27, 16, 11, 0.92), rgba(75, 46, 30, 0.84));
 }
 
 .product-card__media img {
@@ -784,11 +813,15 @@ img {
   display: grid;
   place-items: center;
   background:
-    linear-gradient(135deg, rgba(27, 16, 11, 0.94), rgba(75, 46, 30, 0.88)),
-    var(--br-brand-pattern-url, url('/brand/banco-arabesque-pattern.svg'));
-  background-size: cover, 300px 300px;
-  opacity: 0.5;
+    radial-gradient(circle at 50% 30%, rgba(237, 196, 91, 0.2), transparent 34%),
+    linear-gradient(135deg, rgba(27, 16, 11, 0.95), rgba(75, 46, 30, 0.88));
   color: var(--br-gold-light);
+}
+
+.product-media-surface {
+  background:
+    radial-gradient(circle at 50% 28%, rgba(201, 150, 26, 0.18), transparent 30%),
+    linear-gradient(135deg, rgba(27, 16, 11, 0.94), rgba(75, 46, 30, 0.84));
 }
 
 .product-card__fallback-icon {
@@ -938,7 +971,7 @@ img {
   background:
     linear-gradient(135deg, rgba(27, 16, 11, 0.94), rgba(75, 46, 30, 0.88)),
     var(--br-brand-pattern-url, repeating-linear-gradient(45deg, rgba(201, 150, 26, 0.11) 0 1px, transparent 1px 12px));
-  background-size: cover, 300px 300px;
+  background-size: cover, var(--br-brand-pattern-size, 300px) var(--br-brand-pattern-size, 300px);
 }
 
 .banner-carousel__fallback-icon {
@@ -1243,12 +1276,12 @@ img {
   background-image:
     linear-gradient(135deg, rgba(11,10,8,0.98), rgba(27,16,11,0.94)),
     var(--br-brand-pattern-url, repeating-linear-gradient(45deg, rgba(201,150,26,0.16) 0 1px, transparent 1px 18px));
-  background-size: cover, 300px 300px;
+  background-size: cover, var(--br-brand-pattern-size, 300px) var(--br-brand-pattern-size, 300px);
 }
 
 .bg-hero-subtle {
   background-image:
     linear-gradient(135deg, rgba(27,16,11,0.94), rgba(75,46,30,0.84)),
     var(--br-brand-pattern-url, repeating-linear-gradient(45deg, rgba(201,150,26,0.13) 0 1px, transparent 1px 16px));
-  background-size: cover, 300px 300px;
+  background-size: cover, var(--br-brand-pattern-size, 300px) var(--br-brand-pattern-size, 300px);
 }

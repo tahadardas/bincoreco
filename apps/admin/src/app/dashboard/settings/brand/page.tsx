@@ -21,13 +21,13 @@ const fields = [
   { key: 'brand_logo_light', label: 'الشعار الفاتح', desc: 'للاستخدام على الخلفيات الداكنة', isImage: true },
   { key: 'brand_mark', label: 'العلامة المختصرة (BR Mark)', desc: 'رمز Banco Ricco المختصر', isImage: true },
   { key: 'brand_favicon', label: 'أيقونة المتصفح (Favicon)', desc: 'ظهور في تبويب المتصفح', isImage: true },
-  { key: 'brand_fallback_image', label: 'صورة احتياطية', desc: 'تظهر عند عدم وجود صورة للمنتج', isImage: true },
-  { key: 'brand_pattern', label: 'النقش المزخرف (Pattern)', desc: 'خلفية عربية مزخرفة', isImage: true },
+  { key: 'brand_fallback_image', label: 'صورة احتياطية للمنتجات', desc: 'تُستخدم فقط إذا لم تكن للمنتجات صور.', isImage: true },
+  { key: 'brand_pattern', label: 'زخرفة الخلفية العامة للموقع', desc: 'تُستخدم كزخرفة وخلفية عامة للموقع وتظهر في المساحات الفارغة.', isImage: true },
   { key: 'brand_footer_logo', label: 'شعار الفوتر', desc: 'يظهر في تذييل الموقع', isImage: true },
   { key: 'brand_pattern_opacity', label: 'كثافة النقش (0.00–1.00)', desc: 'افتراضي 0.08 · كلما زاد الرقم زاد الوضوح', isImage: false },
 ];
 
-const previewKeys = ['brand_mark', 'brand_pattern', 'brand_favicon', 'brand_footer_logo', 'brand_fallback_image'] as const;
+const previewKeys = ['brand_mark', 'brand_favicon', 'brand_footer_logo'] as const;
 
 const websiteUrl = process.env.NEXT_PUBLIC_WEBSITE_URL || (typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:3000` : 'http://localhost:3000');
 
@@ -116,6 +116,9 @@ export default function BrandSettingsPage() {
     return val ? resolveMediaUrl(val) : null;
   };
 
+  const patternPreviewUrl = getPreviewUrl('brand_pattern');
+  const fallbackPreviewUrl = getPreviewUrl('brand_fallback_image');
+
   return (
     <div dir="rtl">
       <div className="admin-page-header">
@@ -201,7 +204,7 @@ export default function BrandSettingsPage() {
             إعادة تحميل الإعدادات
           </button>
           <button onClick={testConnection} disabled={testing} className="btn" style={{ background: 'var(--br-espresso)', color: 'var(--br-gold-light)' }}>
-            {testing ? '...جاري الاختبار' : '🔗 اختبار الربط'}
+            {testing ? '...جاري الاختبار' : 'اختبار الخلفية على الموقع'}
           </button>
           <a
             href={`${websiteUrl}/ar`}
@@ -234,24 +237,51 @@ export default function BrandSettingsPage() {
       )}
 
       <div className="card" style={{ marginTop: 20, padding: 20 }}>
-        <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12 }}>معاينة سريعة</h3>
+        <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12 }}>معاينة فصل الخلفية عن صورة المنتج</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
+          <div style={{ border: '1px solid var(--br-line)', borderRadius: 8, overflow: 'hidden', background: '#fff' }}>
+            <div style={{
+              minHeight: 150,
+              padding: 18,
+              display: 'grid',
+              alignContent: 'center',
+              gap: 8,
+              backgroundImage: patternPreviewUrl
+                ? `linear-gradient(rgba(255,250,240,0.9), rgba(255,250,240,0.9)), url("${patternPreviewUrl}")`
+                : 'linear-gradient(135deg, #fffaf0, #f8f1e4)',
+              backgroundSize: patternPreviewUrl ? 'auto, 220px 220px' : 'auto',
+              backgroundRepeat: 'repeat',
+            }}>
+              <strong>زخرفة الخلفية العامة للموقع</strong>
+              <span style={{ color: 'var(--br-muted)', fontSize: 13 }}>
+                تظهر حول الأقسام وفي المساحات الفارغة، ولا تُستخدم كصورة منتج.
+              </span>
+            </div>
+          </div>
+
+          <div style={{ border: '1px solid var(--br-line)', borderRadius: 8, overflow: 'hidden', background: '#fff' }}>
+            <div style={{ minHeight: 150, display: 'grid', placeItems: 'center', background: 'linear-gradient(135deg, #1b100b, #4b2e1e)' }}>
+              {fallbackPreviewUrl ? (
+                <img src={fallbackPreviewUrl} alt="صورة احتياطية للمنتجات" style={{ width: '100%', height: 150, objectFit: 'cover' }} />
+              ) : (
+                <span style={{ color: 'var(--br-gold-light)', fontWeight: 800 }}>Product fallback</span>
+              )}
+            </div>
+            <div style={{ padding: 12 }}>
+              <strong>صورة احتياطية للمنتجات</strong>
+              <p style={{ color: 'var(--br-muted)', fontSize: 13, marginTop: 4 }}>
+                تظهر داخل مساحة صورة المنتج فقط عند عدم وجود صورة فعلية.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginTop: 20, padding: 20 }}>
+        <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12 }}>معاينة سريعة للشعارات</h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 16 }}>
           {previewKeys.map(key => {
             const url = getPreviewUrl(key);
-            if (key === 'brand_pattern' && url) {
-              return (
-                <div key={key} style={{ textAlign: 'center' }}>
-                  <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 6 }}>{fields.find(f => f.key === key)?.label}</div>
-                  <div style={{
-                    width: '100%', height: 80, borderRadius: 8,
-                    backgroundImage: `url(${url})`,
-                    backgroundSize: '200px 200px',
-                    backgroundRepeat: 'repeat',
-                    border: '1px solid var(--br-line)',
-                  }} />
-                </div>
-              );
-            }
             if (!url) return null;
             return (
               <div key={key} style={{ textAlign: 'center' }}>

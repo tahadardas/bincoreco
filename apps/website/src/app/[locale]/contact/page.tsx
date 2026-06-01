@@ -1,8 +1,11 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { api } from '@/lib/api';
 import { getDictionary, Locale } from '@/lib/dictionaries';
+import { contactFormSchema } from '@/lib/forms';
 import EspressoButton from '@/components/espresso-button';
 import { RevealSection } from '@/components/scroll-reveal';
 

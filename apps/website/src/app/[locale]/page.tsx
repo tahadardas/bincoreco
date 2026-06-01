@@ -101,7 +101,7 @@ export default function HomePage() {
   }
 
   return (
-    <div>
+    <div className="page-pattern-surface">
       <section className="bg-hero-dark" style={{
         position: 'relative',
         overflow: 'hidden',
@@ -183,7 +183,7 @@ export default function HomePage() {
 
       {maestroPicks.length > 0 && (
         <RevealSection>
-          <section style={{ padding: '64px 0', background: 'rgba(255,255,255,0.45)' }}>
+          <section className="section-soft-surface">
             <div className="container">
               <SectionHeader eyebrow={dict.home.respectBeans} title={dict.home.maestroPicks} />
               <div className="grid grid-3">
@@ -240,7 +240,7 @@ export default function HomePage() {
       )}
 
       <RevealSection>
-        <section style={{ padding: '64px 0' }}>
+        <section className="section-transparent-shell">
           <div className="container feature-grid">
             <div className="card" style={{ padding: 24 }}>
               <div className="section-eyebrow">{dict.home.coinsTeaser}</div>

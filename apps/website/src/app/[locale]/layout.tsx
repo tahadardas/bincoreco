@@ -1,10 +1,17 @@
-import { ReactNode } from 'react';
+import { CSSProperties, ReactNode } from 'react';
 import { AuthProvider } from '@/lib/auth-context';
 import { BrandProvider } from '@/lib/brand-context';
 import Header from '@/components/header';
 import LocaleHeadUpdater from '@/components/locale-head-updater';
 import { getPublicBrandSettings, resolveBrandAsset } from '@/lib/brand-settings';
 import { resolveMediaUrl } from '@/lib/media';
+
+function normalizePatternOpacity(value: string | null): number {
+  if (!value) return 0.1;
+  const parsed = Number.parseFloat(value);
+  if (!Number.isFinite(parsed)) return 0.1;
+  return Math.min(0.18, Math.max(0.04, parsed));
+}
 
 export default async function LocaleLayout({ children, params }: { children: ReactNode; params: { locale: string } }) {
   const dir = params.locale === 'ar' ? 'rtl' : 'ltr';
@@ -15,14 +22,15 @@ export default async function LocaleLayout({ children, params }: { children: Rea
   const patternUrl = resolveBrandAsset(brand.brand_pattern, '/brand/banco-arabesque-pattern.svg');
   const faviconUrl = resolveMediaUrl(brand.brand_favicon) || '/favicon.ico';
 
-  const patternOpacity = brand.brand_pattern_opacity
-    ? parseFloat(brand.brand_pattern_opacity)
-    : 0.08;
+  const patternOpacity = normalizePatternOpacity(brand.brand_pattern_opacity);
 
   const brandVars = {
     '--br-brand-pattern-url': `url("${patternUrl}")`,
+    '--br-brand-pattern-opacity': patternOpacity,
+    '--br-brand-pattern-size': '420px',
     '--br-pattern-opacity': patternOpacity,
-  } as React.CSSProperties;
+    '--br-pattern-size': '420px',
+  } as CSSProperties;
 
   return (
     <AuthProvider>
