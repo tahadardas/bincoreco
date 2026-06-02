@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
@@ -16,8 +16,27 @@ export default function Header({ brandMark }: HeaderProps) {
   const dict = getDictionary(locale);
   const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const toggleRef = useRef<HTMLButtonElement>(null);
 
-  const closeMenu = () => setMenuOpen(false);
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        closeMenu();
+        toggleRef.current?.focus();
+      }
+    };
+    document.addEventListener('keydown', handleKey);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', handleKey);
+      document.body.style.overflow = '';
+    };
+  }, [menuOpen, closeMenu]);
+
   const navLinks = [
     { href: `/${locale}`, label: dict.nav.home },
     { href: `/${locale}/products`, label: dict.nav.products },
@@ -53,16 +72,20 @@ export default function Header({ brandMark }: HeaderProps) {
           </span>
         </Link>
         <button
+          ref={toggleRef}
           className="br-menu-toggle"
           type="button"
-          aria-label={menuOpen ? 'Close navigation' : 'Open navigation'}
+          aria-label={menuOpen ? (locale === 'ar' ? 'إغلاق القائمة' : 'Close navigation') : (locale === 'ar' ? 'فتح القائمة' : 'Open navigation')}
           aria-expanded={menuOpen}
+          aria-controls="mobile-drawer-nav"
           onClick={() => setMenuOpen(open => !open)}
         >
           <span />
           <span />
           <span />
         </button>
+
+        {/* Desktop nav */}
         <nav className="br-nav" aria-label="Main navigation">
           {navLinks.map(link => (
             <Link key={link.href} href={link.href}>{link.label}</Link>
@@ -74,13 +97,20 @@ export default function Header({ brandMark }: HeaderProps) {
           {authControl}
         </nav>
       </div>
-      <div className={`br-mobile-drawer ${menuOpen ? 'is-open' : ''}`}>
-        <nav className="br-mobile-drawer__nav" aria-label="Mobile navigation">
+
+      {/* Mobile drawer */}
+      <div
+        ref={drawerRef}
+        className={`br-mobile-drawer ${menuOpen ? 'is-open' : ''}`}
+        aria-hidden={!menuOpen}
+      >
+        <div className="br-mobile-drawer__overlay" onClick={closeMenu} />
+        <nav id="mobile-drawer-nav" className="br-mobile-drawer__nav" aria-label={locale === 'ar' ? 'القائمة الرئيسية' : 'Mobile navigation'}>
           {navLinks.map(link => (
             <Link key={link.href} href={link.href} onClick={closeMenu}>{link.label}</Link>
           ))}
           <div className="br-mobile-drawer__controls">
-            <CurrencySwitcher className="lang-switch br-mobile-select" />
+            <CurrencySwitcher />
             <Link href={`/${locale === 'ar' ? 'en' : 'ar'}`} className="lang-switch" onClick={closeMenu}>
               {locale === 'ar' ? 'EN' : 'AR'}
             </Link>

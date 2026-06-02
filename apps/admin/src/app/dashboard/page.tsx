@@ -1,8 +1,10 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { adminFetch } from '@/lib/api';
 import { formatMoney, MoneyAmount } from '@/lib/money';
+import { DashboardSkeleton } from './skeleton';
+import { Alert } from './alert';
 
 interface TopProduct {
   productId: string;
@@ -21,6 +23,8 @@ interface DashboardData {
   totalActiveProducts: number;
   totalCustomers: number;
   topProducts: TopProduct[];
+  warnings?: string[];
+  generatedAt?: string;
 }
 
 function StatCard({
@@ -50,33 +54,91 @@ function StatCard({
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    adminFetch<DashboardData>('/admin/dashboard')
-      .then(setData)
-      .catch(err => setError(err instanceof Error ? err.message : 'تعذر تحميل لوحة التحكم'));
+  const fetchDashboard = useCallback(async (showLoading = false) => {
+    if (showLoading) setRefreshing(true);
+    try {
+      const result = await adminFetch<DashboardData>('/admin/dashboard');
+      setData(result);
+      setLastUpdated(new Date());
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'تعذر تحميل لوحة التحكم');
+    } finally {
+      setRefreshing(false);
+    }
   }, []);
 
-  if (error) {
-    return <div className="card" style={{ color: 'var(--br-danger)' }}>{error}</div>;
+  useEffect(() => {
+    fetchDashboard(true);
+  }, [fetchDashboard]);
+
+  useEffect(() => {
+    const interval = setInterval(() => fetchDashboard(), 30000);
+    return () => clearInterval(interval);
+  }, [fetchDashboard]);
+
+  const formatTimestamp = (date: Date) => {
+    return new Intl.DateTimeFormat('ar-SY', {
+      dateStyle: 'medium',
+      timeStyle: 'medium',
+    }).format(date);
+  };
+
+  if (error && !data) {
+    return (
+      <div dir="rtl">
+        <div className="admin-page-header">
+          <h1 style={{ fontSize: 28, fontWeight: 700 }}>لوحة التحكم</h1>
+        </div>
+        <Alert tone="error">{error}</Alert>
+      </div>
+    );
   }
 
   if (!data) {
-    return <div style={{ padding: 40 }}>جاري تحميل لوحة التحكم...</div>;
+    return (
+      <div dir="rtl">
+        <DashboardSkeleton />
+      </div>
+    );
   }
 
   return (
     <div dir="rtl">
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center', marginBottom: 28, flexWrap: 'wrap' }}>
+      <div className="admin-page-header">
         <div>
           <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 6 }}>لوحة التحكم</h1>
           <p style={{ color: 'var(--br-muted)', fontSize: 14 }}>نظرة اليوم التشغيلية للطلبات والمبيعات.</p>
+          {lastUpdated && (
+            <p style={{ color: 'var(--br-muted)', fontSize: 12, marginTop: 4 }}>
+              آخر تحديث: {formatTimestamp(lastUpdated)}
+            </p>
+          )}
         </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <button
+            onClick={() => fetchDashboard(true)}
+            className="btn btn-sm"
+            style={{ background: 'var(--br-cream)' }}
+            disabled={refreshing}
+          >
+            {refreshing ? 'جاري التحديث...' : 'تحديث'}
+          </button>
           <Link href="/dashboard/orders" className="btn btn-primary">إدارة الطلبات</Link>
           <Link href="/dashboard/products" className="btn" style={{ background: 'var(--br-black)', color: 'white' }}>إدارة المنتجات</Link>
         </div>
       </div>
+
+      {data.warnings && data.warnings.length > 0 && (
+        <div style={{ marginBottom: 20 }}>
+          {data.warnings.map((w, i) => (
+            <Alert key={i} tone="warning">{w}</Alert>
+          ))}
+        </div>
+      )}
 
       <div className="grid-stats">
         <StatCard label="طلبات اليوم" value={data.todayOrders} />

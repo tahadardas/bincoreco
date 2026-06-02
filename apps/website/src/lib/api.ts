@@ -24,12 +24,10 @@ export class ApiError extends Error {
   }
 }
 
+import { tokenStorage } from './token-storage';
+
 function clearStoredAuth() {
-  if (typeof window === 'undefined') {
-    return;
-  }
-  localStorage.removeItem('token');
-  localStorage.removeItem('refreshToken');
+  tokenStorage.clearAll();
   window.dispatchEvent(new Event('banco-auth-unauthorized'));
 }
 

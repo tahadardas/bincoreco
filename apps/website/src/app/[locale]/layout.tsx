@@ -1,4 +1,5 @@
 import { CSSProperties, ReactNode } from 'react';
+import type { Metadata } from 'next';
 import { AuthProvider } from '@/lib/auth-context';
 import { BrandProvider } from '@/lib/brand-context';
 import { CurrencyProvider } from '@/lib/currency-context';
@@ -7,6 +8,33 @@ import LocaleHeadUpdater from '@/components/locale-head-updater';
 import PasswordChangeGate from '@/components/password-change-gate';
 import { getPublicBrandSettings, resolveBrandAsset } from '@/lib/brand-settings';
 import { resolveMediaUrl } from '@/lib/media';
+
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+
+export async function generateMetadata({ params }: { params: { locale: string } }): Promise<Metadata> {
+  const isAr = params.locale === 'ar';
+  return {
+    title: isAr ? 'Banco Ricco | تجربة قهوة فاخرة في دمشق' : 'Banco Ricco | Premium Coffee Experience',
+    description: isAr
+      ? 'اطلب قهوتك للاستلام، اختر البن والطحن المناسب، واجمع B.R Coins مع Banco Ricco.'
+      : 'Order premium coffee for pickup, choose beans and grind options, and collect B.R Coins.',
+    alternates: {
+      canonical: `${siteUrl}/${params.locale}`,
+      languages: {
+        ar: `${siteUrl}/ar`,
+        en: `${siteUrl}/en`,
+      },
+    },
+    openGraph: {
+      locale: isAr ? 'ar_SY' : 'en_US',
+      alternateLocale: isAr ? 'en_US' : 'ar_SY',
+      title: isAr ? 'Banco Ricco | تجربة قهوة فاخرة في دمشق' : 'Banco Ricco | Premium Coffee Experience',
+      description: isAr
+        ? 'اطلب قهوتك للاستلام، اختر البن والطحن المناسب، واجمع B.R Coins مع Banco Ricco.'
+        : 'Order premium coffee for pickup, choose beans and grind options, and collect B.R Coins.',
+    },
+  };
+}
 
 function normalizePatternOpacity(value: string | null): number {
   if (!value) return 0.1;

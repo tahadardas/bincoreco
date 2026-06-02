@@ -6,6 +6,10 @@ import { api } from '@/lib/api';
 import { getDictionary, Locale } from '@/lib/dictionaries';
 import { useAuth } from '@/lib/auth-context';
 import EspressoButton from '@/components/espresso-button';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { SkeletonCard } from '@/components/ui/LoadingSkeleton';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Alert } from '@/components/ui/Alert';
 
 interface LoyaltyTransaction {
   id: string;
@@ -63,7 +67,7 @@ export default function LoyaltyPage() {
       return;
     }
     load(token)
-      .catch(err => setError(err instanceof Error ? err.message : 'Unable to load loyalty'))
+      .catch(err => setError(locale === 'ar' ? 'تعذر تحميل بيانات الولاء' : 'Unable to load loyalty'))
       .finally(() => setLoading(false));
   }, [token, locale, router]);
 
@@ -88,7 +92,7 @@ export default function LoyaltyPage() {
       setRedeemPoints(0);
       await load(token);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to redeem points');
+      setError(err instanceof Error ? err.message : (locale === 'ar' ? 'تعذر استبدال النقاط' : 'Unable to redeem points'));
     }
   };
 
@@ -98,7 +102,7 @@ export default function LoyaltyPage() {
       const q = await api.post<QRCard>('/loyalty/qr/regenerate', {}, token);
       setQr(q);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to regenerate QR');
+      setError(err instanceof Error ? err.message : (locale === 'ar' ? 'تعذر تجديد رمز QR' : 'Unable to regenerate QR'));
     }
   };
 
@@ -115,8 +119,33 @@ export default function LoyaltyPage() {
   };
 
   if (!user) return null;
-  if (loading) return <div className="page-shell" style={{ textAlign: 'center' }}>Loading...</div>;
-  if (!data) return <div className="page-shell" style={{ textAlign: 'center' }}>{error || 'Not available'}</div>;
+
+  if (loading) {
+    return (
+      <div className="page-shell">
+        <div className="container">
+          <PageHeader eyebrow="Banco Ricco" title={dict.loyalty.title} />
+          <div style={{ display: 'grid', gap: 20 }}>
+            <SkeletonCard lines={4} />
+            <SkeletonCard lines={4} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="page-shell">
+        <div className="container">
+          <PageHeader eyebrow="Banco Ricco" title={dict.loyalty.title} />
+          {error ? <Alert tone="error">{error}</Alert> : (
+            <EmptyState title={locale === 'ar' ? 'غير متاح' : 'Not available'} icon="⚠️" />
+          )}
+        </div>
+      </div>
+    );
+  }
 
   const progress = Math.min((data.stampCount / data.stampTarget) * 100, 100);
 
@@ -133,28 +162,12 @@ export default function LoyaltyPage() {
   return (
     <div className="page-shell">
       <div className="container">
-        <div className="section-heading">
-          <div>
-            <div className="section-eyebrow">Banco Ricco</div>
-            <h1 className="section-title">{dict.loyalty.title}</h1>
-          </div>
-          <p className="section-copy">{dict.loyalty.subtitle}</p>
-        </div>
+        <PageHeader eyebrow="Banco Ricco" title={dict.loyalty.title} description={dict.loyalty.subtitle} />
 
-        {msg && (
-          <div style={{ padding: 14, background: 'var(--br-success)', color: '#fff', borderRadius: 8, marginBottom: 16, fontWeight: 800 }}>
-            {msg}
-          </div>
-        )}
-        {error && (
-          <div style={{ padding: 14, background: 'var(--br-danger)', color: '#fff', borderRadius: 8, marginBottom: 16, fontWeight: 800 }}>
-            {error}
-          </div>
-        )}
+        {msg && <Alert tone="success">{msg}</Alert>}
+        {error && <Alert tone="error">{error}</Alert>}
 
-        {/* Stamps + Points cards in a 2-col grid */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 28 }} className="loyalty-grid">
-          {/* Stamps Card */}
           <div className="card" style={{
             ...sectionCard, textAlign: 'center',
             background: 'linear-gradient(180deg, #faf6ef, #ede4d3)',
@@ -176,7 +189,6 @@ export default function LoyaltyPage() {
               <span />
             </div>
 
-            {/* Stamp circles */}
             <div style={{ display: 'flex', gap: 6, justifyContent: 'center', marginTop: 16, flexWrap: 'wrap' }}>
               {Array.from({ length: data.stampTarget }, (_, i) => (
                 <div key={i} className={i < data.stampCount ? 'stamp-pop' : ''} style={{
@@ -197,14 +209,13 @@ export default function LoyaltyPage() {
 
             {data.stampCount >= data.stampTarget && (
               <div style={{ marginTop: 18 }}>
-                <EspressoButton onClick={handleRedeemStamp} tone="gold">
+                <EspressoButton onClick={handleRedeemStamp}>
                   {dict.loyalty.redeemStamp}
                 </EspressoButton>
               </div>
             )}
           </div>
 
-          {/* Points Card */}
           <div className="card" style={{
             ...sectionCard, textAlign: 'center',
             background: 'linear-gradient(135deg, #2c1810, #3d2317)',
@@ -248,7 +259,6 @@ export default function LoyaltyPage() {
           </div>
         </div>
 
-        {/* QR Card */}
         <div className="card" style={{ ...sectionCard, marginBottom: 28 }}>
           <h2 style={{ fontSize: 20, fontWeight: 900, marginBottom: 16 }}>
             <span style={{ marginInlineEnd: 8 }}>📱</span>
@@ -274,14 +284,13 @@ export default function LoyaltyPage() {
           </div>
         </div>
 
-        {/* Transaction History */}
         <div className="card" style={{ ...sectionCard, overflowX: 'auto' }}>
           <h2 style={{ fontSize: 20, fontWeight: 900, marginBottom: 16 }}>
             <span style={{ marginInlineEnd: 8 }}>📋</span>
             {dict.loyalty.history}
           </h2>
           {data.transactions.length === 0 ? (
-            <p style={{ color: 'var(--br-muted)' }}>{dict.loyalty.noHistory}</p>
+            <EmptyState title={dict.loyalty.noHistory} icon="📭" />
           ) : (
             <table className="table">
               <thead>
@@ -313,29 +322,27 @@ export default function LoyaltyPage() {
               </tbody>
             </table>
           )}
-    </div>
+        </div>
 
-    {/* Celebration confetti */}
-    {celebrate && (
-      <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 100, overflow: 'hidden' }}>
-        {Array.from({ length: 24 }, (_, i) => (
-          <div
-            key={i}
-            className="stamp-confetti"
-            style={{
-              left: `${10 + Math.random() * 80}%`,
-              top: `${40 + Math.random() * 30}%`,
-              background: ['var(--br-gold)', 'var(--br-gold-light)', 'var(--br-coffee)', 'var(--br-espresso)'][i % 4],
-              animationDelay: `${i * 0.08}s`,
-              width: `${6 + Math.random() * 8}px`,
-              height: `${6 + Math.random() * 8}px`,
-            }}
-          />
-        ))}
+        {celebrate && (
+          <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 100, overflow: 'hidden' }}>
+            {Array.from({ length: 24 }, (_, i) => (
+              <div
+                key={i}
+                className="stamp-confetti"
+                style={{
+                  left: `${10 + Math.random() * 80}%`,
+                  top: `${40 + Math.random() * 30}%`,
+                  background: ['var(--br-gold)', 'var(--br-gold-light)', 'var(--br-coffee)', 'var(--br-espresso)'][i % 4],
+                  animationDelay: `${i * 0.08}s`,
+                  width: `${6 + Math.random() * 8}px`,
+                  height: `${6 + Math.random() * 8}px`,
+                }}
+              />
+            ))}
+          </div>
+        )}
       </div>
-    )}
-  </div>
-
     </div>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { api } from './api';
+import { tokenStorage } from './token-storage';
 
 interface User {
   id: string;
@@ -29,14 +30,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const storedToken = localStorage.getItem('token');
+    const storedToken = tokenStorage.getAccessToken();
     if (storedToken) {
       setToken(storedToken);
       api.get<any>('/auth/me', storedToken)
         .then(setUser)
         .catch(() => {
-          localStorage.removeItem('token');
-          localStorage.removeItem('refreshToken');
+          tokenStorage.clearAll();
         })
         .finally(() => setLoading(false));
     } else {
@@ -60,16 +60,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const result = await api.post<{ user: User; accessToken: string; refreshToken: string }>('/auth/login', credentials);
     setUser(result.user);
     setToken(result.accessToken);
-    localStorage.setItem('token', result.accessToken);
-    localStorage.setItem('refreshToken', result.refreshToken);
+    tokenStorage.setAccessToken(result.accessToken);
+    tokenStorage.setRefreshToken(result.refreshToken);
   };
 
   const register = async (input: { email?: string; phone?: string; password: string; fullName: string }) => {
     const result = await api.post<{ user: User; accessToken: string; refreshToken: string }>('/auth/register', input);
     setUser(result.user);
     setToken(result.accessToken);
-    localStorage.setItem('token', result.accessToken);
-    localStorage.setItem('refreshToken', result.refreshToken);
+    tokenStorage.setAccessToken(result.accessToken);
+    tokenStorage.setRefreshToken(result.refreshToken);
   };
 
   const changePassword = async (currentPassword: string, newPassword: string) => {
@@ -83,8 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     setUser(null);
     setToken(null);
-    localStorage.removeItem('token');
-    localStorage.removeItem('refreshToken');
+    tokenStorage.clearAll();
   };
 
   return (

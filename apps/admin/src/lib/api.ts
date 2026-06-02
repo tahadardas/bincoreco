@@ -1,3 +1,5 @@
+import { adminTokenStorage } from './token-storage';
+
 export function getAdminApiBaseUrl() {
   if (process.env.NEXT_PUBLIC_API_URL) {
     return process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, '');
@@ -19,13 +21,13 @@ export function getWebsiteBaseUrl() {
 }
 
 export async function adminFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('admin_token') : null;
+  const token = adminTokenStorage.getToken();
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
   const res = await fetch(`${getAdminApiBaseUrl()}${endpoint}`, { ...options, headers });
   if (res.status === 401) {
-    localStorage.removeItem('admin_token');
+    adminTokenStorage.removeToken();
     if (typeof window !== 'undefined') window.location.href = '/login';
     throw new Error('Unauthorized');
   }
@@ -39,7 +41,7 @@ export async function adminFetch<T>(endpoint: string, options: RequestInit = {})
 }
 
 export async function adminUpload(file: File, folder: string = 'products'): Promise<{ url: string }> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('admin_token') : null;
+  const token = adminTokenStorage.getToken();
   const formData = new FormData();
   formData.append('file', file);
   const res = await fetch(`${getAdminApiBaseUrl()}/admin/media/upload?folder=${folder}`, {
@@ -48,7 +50,7 @@ export async function adminUpload(file: File, folder: string = 'products'): Prom
     body: formData,
   });
   if (res.status === 401) {
-    localStorage.removeItem('admin_token');
+    adminTokenStorage.removeToken();
     if (typeof window !== 'undefined') window.location.href = '/login';
     throw new Error('Unauthorized');
   }

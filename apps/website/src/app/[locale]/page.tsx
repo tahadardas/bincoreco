@@ -10,6 +10,8 @@ import ProductCard, { ProductSummary } from '@/components/product-card';
 import BannerCarousel from '@/components/banner-carousel';
 import HeroBackgroundCarousel from '@/components/hero-background-carousel';
 import { RevealSection } from '@/components/scroll-reveal';
+import { HomePageSkeleton } from '@/components/ui/LoadingSkeleton';
+import { Alert } from '@/components/ui/Alert';
 
 interface Banner {
   id: string;
@@ -62,6 +64,8 @@ export default function HomePage() {
   const [specialCoffee, setSpecialCoffee] = useState<ProductSummary[]>([]);
   const [showAuth, setShowAuth] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [bannersError, setBannersError] = useState(false);
+  const [productsError, setProductsError] = useState(false);
 
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
@@ -71,21 +75,32 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    Promise.all([
-      api.get<Banner[]>(`/banners?locale=${locale}&placement=HOME_HERO`),
-      api.get<Banner[]>(`/banners?locale=${locale}&placement=HOME_PROMO`),
-      api.get<ProductSummary[]>(`/products/best-sellers?locale=${locale}`),
-      api.get<ProductSummary[]>(`/products/maestro-picks?locale=${locale}`),
-      api.get<ProductSummary[]>(`/products?locale=${locale}&type=COFFEE_BEAN&limit=6`),
-      api.get<ProductSummary[]>(`/products?locale=${locale}&search=${encodeURIComponent('B.R Special')}&limit=2`),
-    ]).then(([heroData, promoData, best, picks, beanProducts, special]) => {
-      setHeroSlides(heroData);
-      setPromoBanners(promoData);
-      setBestSellers(best);
-      setMaestroPicks(picks);
-      setBeans(beanProducts);
-      setSpecialCoffee(special);
-    }).catch(console.error).finally(() => setLoading(false));
+    setLoading(true);
+    setBannersError(false);
+    setProductsError(false);
+
+    const bannersPromise = Promise.all([
+      api.get<Banner[]>(`/banners?locale=${locale}&placement=HOME_HERO`).catch(() => { setBannersError(true); return []; }),
+      api.get<Banner[]>(`/banners?locale=${locale}&placement=HOME_PROMO`).catch(() => { setBannersError(true); return []; }),
+    ]);
+
+    const productsPromise = Promise.all([
+      api.get<ProductSummary[]>(`/products/best-sellers?locale=${locale}`).catch(() => { setProductsError(true); return []; }),
+      api.get<ProductSummary[]>(`/products/maestro-picks?locale=${locale}`).catch(() => { setProductsError(true); return []; }),
+      api.get<ProductSummary[]>(`/products?locale=${locale}&type=COFFEE_BEAN&limit=6`).catch(() => { setProductsError(true); return []; }),
+      api.get<ProductSummary[]>(`/products?locale=${locale}&search=${encodeURIComponent('B.R Special')}&limit=2`).catch(() => { setProductsError(true); return []; }),
+    ]);
+
+    Promise.all([bannersPromise, productsPromise])
+      .then(([[heroData, promoData], [best, picks, beanProducts, special]]) => {
+        if (heroData) setHeroSlides(heroData);
+        if (promoData) setPromoBanners(promoData);
+        if (best) setBestSellers(best);
+        if (picks) setMaestroPicks(picks);
+        if (beanProducts) setBeans(beanProducts);
+        if (special) setSpecialCoffee(special);
+      })
+      .finally(() => setLoading(false));
   }, [locale]);
 
   const labels = {
@@ -95,17 +110,19 @@ export default function HomePage() {
   };
 
   if (loading) {
-    return (
-      <div className="page-shell" style={{ textAlign: 'center' }}>
-        <img src={resolvedMark} alt="" style={{ width: 96, height: 96, objectFit: 'contain', marginBottom: 16 }} />
-        <div style={{ fontSize: 24, color: 'var(--br-gold)', fontWeight: 900 }}>Banco Ricco</div>
-        <div style={{ marginTop: 10, color: 'var(--br-muted)' }}>Loading...</div>
-      </div>
-    );
+    return <HomePageSkeleton />;
   }
 
   return (
     <div className="page-pattern-surface">
+      {(bannersError || productsError) && (
+        <div className="container" style={{ paddingTop: 16 }}>
+          <Alert tone="warning">
+            {locale === 'ar' ? 'بعض الأقسام غير متاحة حالياً' : 'Some sections are currently unavailable'}
+          </Alert>
+        </div>
+      )}
+
       {heroSlides.length > 0 ? (
         <HeroBackgroundCarousel slides={heroSlides} locale={locale} />
       ) : (

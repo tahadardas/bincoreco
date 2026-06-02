@@ -13,56 +13,56 @@ export class AdminService {
   ) {}
 
   async getDashboard() {
-    try {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
 
-      const [
-        todayOrdersCount,
-        todayRevenue,
-        pendingOrders,
-        preparingOrders,
-        totalProducts,
-        totalCustomers,
-        topProducts,
-      ] = await Promise.all([
-        this.prisma.order.count({
-          where: { createdAt: { gte: today, lt: tomorrow } },
-        }),
-        this.prisma.order.aggregate({
-          where: { createdAt: { gte: today, lt: tomorrow }, status: { not: 'CANCELLED' } },
-          _sum: { total: true },
-        }).catch(() => ({ _sum: { total: null } })),
-        this.prisma.order.count({ where: { status: 'PENDING' } }),
-        this.prisma.order.count({ where: { status: 'PREPARING' } }),
-        this.prisma.product.count({ where: { isActive: true, deletedAt: null } }),
-        this.prisma.user.count({ where: { role: 'customer', isActive: true } }),
-        this.reportsService.getTopProducts({
-          fromDate: today.toISOString(),
-          toDate: tomorrow.toISOString(),
-          limit: 5,
-        }).catch(() => []),
-      ]);
-      const todayRevenueTotal = todayRevenue?._sum?.total?.toNumber() || 0;
+    const results = await Promise.allSettled([
+      this.prisma.order.count({
+        where: { createdAt: { gte: today, lt: tomorrow } },
+      }),
+      this.prisma.order.aggregate({
+        where: { createdAt: { gte: today, lt: tomorrow }, status: { not: 'CANCELLED' } },
+        _sum: { total: true },
+      }),
+      this.prisma.order.count({ where: { status: 'PENDING' } }),
+      this.prisma.order.count({ where: { status: 'PREPARING' } }),
+      this.prisma.product.count({ where: { isActive: true, deletedAt: null } }),
+      this.prisma.user.count({ where: { role: 'customer', isActive: true } }),
+      this.reportsService.getTopProducts({
+        fromDate: today.toISOString(),
+        toDate: tomorrow.toISOString(),
+        limit: 5,
+      }),
+    ]);
 
-      return {
-        todayOrders: todayOrdersCount || 0,
-        todayRevenue: todayRevenueTotal || 0,
-        pendingOrders: pendingOrders || 0,
-        preparingOrders: preparingOrders || 0,
-        totalActiveProducts: totalProducts || 0,
-        totalCustomers: totalCustomers || 0,
-        topProducts: topProducts || [],
-      };
-    } catch (e: any) {
-      return {
-        todayOrders: 0, todayRevenue: 0, pendingOrders: 0,
-        preparingOrders: 0, totalActiveProducts: 0, totalCustomers: 0,
-        topProducts: [],
-      };
+    const warnings: string[] = [];
+
+    const todayOrdersCount = results[0].status === 'fulfilled' ? results[0].value : (() => { warnings.push('تعذر حساب طلبات اليوم'); return 0; })();
+    const todayRevenue = results[1].status === 'fulfilled' ? (results[1].value._sum?.total?.toNumber() || 0) : (() => { warnings.push('تعذر حساب مبيعات اليوم'); return 0; })();
+    const pendingOrders = results[2].status === 'fulfilled' ? results[2].value : (() => { warnings.push('تعذر حساب الطلبات المعلقة'); return 0; })();
+    const preparingOrders = results[3].status === 'fulfilled' ? results[3].value : (() => { warnings.push('تعذر حساب الطلبات قيد التحضير'); return 0; })();
+    const totalActiveProducts = results[4].status === 'fulfilled' ? results[4].value : (() => { warnings.push('تعذر حساب المنتجات النشطة'); return 0; })();
+    const totalCustomers = results[5].status === 'fulfilled' ? results[5].value : (() => { warnings.push('تعذر حساب العملاء'); return 0; })();
+    const topProducts = results[6].status === 'fulfilled' ? results[6].value : (() => { warnings.push('تعذر حساب أفضل المنتجات'); return []; })();
+
+    const allFailed = results.every(r => r.status === 'rejected');
+    if (allFailed) {
+      throw new InternalServerErrorException('تعذر تحميل بيانات لوحة التحكم');
     }
+
+    return {
+      todayOrders: todayOrdersCount,
+      todayRevenue,
+      pendingOrders,
+      preparingOrders,
+      totalActiveProducts,
+      totalCustomers,
+      topProducts,
+      warnings: warnings.length > 0 ? warnings : undefined,
+      generatedAt: new Date().toISOString(),
+    };
   }
 
   async getOrders(params: {

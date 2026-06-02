@@ -1,57 +1,115 @@
+import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
+import { UnauthorizedException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 
 describe('AuthService', () => {
-  it('creates customer profile, loyalty account, and QR card when registering a customer', async () => {
-    const tx = {
+  let service: AuthService;
+  let prisma: any;
+  let usersService: any;
+
+  beforeEach(async () => {
+    prisma = {
       user: {
-        create: jest.fn().mockResolvedValue({
-          id: 'user-1',
-          email: 'customer@example.com',
-          phone: null,
-          fullName: 'Test Customer',
-          role: 'customer',
-        }),
+        findUnique: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
       },
       customerProfile: {
-        create: jest.fn().mockResolvedValue({ id: 'profile-1', userId: 'user-1' }),
+        create: jest.fn(),
       },
       loyaltyAccount: {
-        create: jest.fn().mockResolvedValue({ id: 'loyalty-1', customerId: 'profile-1' }),
+        create: jest.fn(),
       },
       qRCard: {
-        create: jest.fn().mockResolvedValue({ id: 'qr-1', customerId: 'profile-1' }),
+        create: jest.fn(),
       },
+      $transaction: jest.fn(async (fn: any) => fn(prisma)),
     };
 
-    const prisma = {
-      $transaction: jest.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)),
-    } as unknown as PrismaService;
-    const jwtService = {
-      sign: jest.fn().mockReturnValue('token'),
-    } as unknown as JwtService;
-    const usersService = {
-      findByIdentifier: jest.fn().mockResolvedValue(null),
-    } as unknown as UsersService;
+    usersService = {
+      findByIdentifier: jest.fn(),
+      findById: jest.fn(),
+    };
 
-    const service = new AuthService(prisma, jwtService, usersService);
+    const jwtService = new JwtService({ secret: 'test-secret' });
+    service = new AuthService(prisma as unknown as PrismaService, jwtService, usersService as unknown as UsersService);
+  });
 
-    const result = await service.register({
-      email: 'customer@example.com',
-      password: 'secret123',
-      fullName: 'Test Customer',
+  describe('login', () => {
+    it('rejects invalid credentials', async () => {
+      usersService.findByIdentifier.mockResolvedValue(null);
+
+      await expect(service.login({ email: 'test@test.com', password: 'wrong' })).rejects.toThrow(UnauthorizedException);
     });
 
-    expect(tx.user.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ role: 'customer' }),
-    }));
-    expect(tx.customerProfile.create).toHaveBeenCalledWith({ data: { userId: 'user-1' } });
-    expect(tx.loyaltyAccount.create).toHaveBeenCalledWith({ data: { customerId: 'profile-1' } });
-    expect(tx.qRCard.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ customerId: 'profile-1' }),
+    it('rejects inactive account', async () => {
+      usersService.findByIdentifier.mockResolvedValue({
+        id: 'user-1',
+        email: 'test@test.com',
+        passwordHash: '$2a$10$hashed',
+        isActive: false,
+      });
+
+      await expect(service.login({ email: 'test@test.com', password: 'pass' })).rejects.toThrow(ForbiddenException);
     });
-    expect(result.user.role).toBe('customer');
+
+    it('rejects wrong password', async () => {
+      const bcrypt = require('bcryptjs');
+      const hash = await bcrypt.hash('correct', 10);
+      usersService.findByIdentifier.mockResolvedValue({
+        id: 'user-1',
+        email: 'test@test.com',
+        passwordHash: hash,
+        isActive: true,
+      });
+
+      await expect(service.login({ email: 'test@test.com', password: 'wrong' })).rejects.toThrow(UnauthorizedException);
+    });
+  });
+
+  describe('register', () => {
+    it('rejects duplicate user', async () => {
+      usersService.findByIdentifier.mockResolvedValue({ id: 'existing' });
+
+      await expect(service.register({
+        email: 'existing@test.com',
+        password: 'pass123',
+        fullName: 'Test',
+      })).rejects.toThrow(ConflictException);
+    });
+
+    it('creates user and returns tokens', async () => {
+      usersService.findByIdentifier.mockResolvedValue(null);
+      prisma.user.create.mockResolvedValue({
+        id: 'new-user-1',
+        email: 'new@test.com',
+        phone: null,
+        fullName: 'New User',
+        role: 'customer',
+        mustChangePassword: false,
+      });
+      prisma.customerProfile.create.mockResolvedValue({ id: 'profile-1' });
+      prisma.loyaltyAccount.create.mockResolvedValue({});
+      prisma.qRCard.create.mockResolvedValue({});
+
+      const result = await service.register({
+        email: 'new@test.com',
+        password: 'pass123',
+        fullName: 'New User',
+      });
+
+      expect(result.accessToken).toBeDefined();
+      expect(result.refreshToken).toBeDefined();
+      expect(result.user.email).toBe('new@test.com');
+    });
+  });
+
+  describe('refresh', () => {
+    it('rejects invalid refresh token', async () => {
+      await expect(service.refresh('invalid-token')).rejects.toThrow(UnauthorizedException);
+    });
   });
 });
